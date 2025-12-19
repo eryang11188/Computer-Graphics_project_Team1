@@ -1,6 +1,6 @@
 // main.cpp
 // C++ + OpenGL(3.3) + GLFW + GLAD + GLM
-// 땅/도로/인도 + 카메라 + 마우스 휠 줌 기능 추가 + 테두리 없는 창
+// Ground/Road/Sidewalk + Orbit Camera + Mouse Wheel Zoom + Borderless Window
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -11,20 +11,21 @@
 
 #include <vector>
 #include <iostream>
+#include <cmath> // std::sin, std::cos
 
-#include "WorldConfig.h"     // main.cpp와 같은 폴더
-#include "TransformUtils.h"  // main.cpp와 같은 폴더
+#include "WorldConfig.h"
+#include "TransformUtils.h"
 
-// ---- 카메라(오빗) ----
+// Orbit camera
 float yaw = 0.0f;
-float pitch = glm::radians(20.0f);
-float radius = 35.0f;
-float angularSpeed = 1.5f;
+float pitch = glm::radians(WC::CAM_PITCH_DEG);
+float radius = WC::CAM_RADIUS;
+float angularSpeed = WC::CAM_SPEED;
 
-// ---- 휠 줌 ----
-float zoomSpeed = 2.0f;
-float radiusMin = 6.0f;
-float radiusMax = 120.0f;
+// Wheel zoom
+float zoomSpeed = WC::ZOOM_SPEED;
+float radiusMin = WC::R_MIN;
+float radiusMax = WC::R_MAX;
 
 static void glfw_error_callback(int code, const char* desc) {
     std::cerr << "[GLFW ERROR] " << code << " : " << (desc ? desc : "") << "\n";
@@ -50,7 +51,7 @@ void processInput(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) pitch += angularSpeed * deltaTime;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) pitch -= angularSpeed * deltaTime;
 
-    float limit = glm::radians(89.0f);
+    constexpr float limit = glm::radians(89.0f);
     if (pitch > limit) pitch = limit;
     if (pitch < -limit) pitch = -limit;
 }
@@ -107,15 +108,15 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    // ===== "테두리 없는 창" (보더리스 윈도우) =====
+    // Borderless window
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
 
-    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE); // 테두리 제거
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-    const int WIN_W = 1600;
-    const int WIN_H = 900;
+    const int WIN_W = WC::WIN_W;
+    const int WIN_H = WC::WIN_H;
 
     GLFWwindow* window = glfwCreateWindow(WIN_W, WIN_H, "World (Borderless Window)", nullptr, nullptr);
     if (!window) {
@@ -124,7 +125,7 @@ int main() {
         return -1;
     }
 
-    // 모니터 중앙에 배치
+    // Center on monitor
     int mx, my;
     glfwGetMonitorPos(monitor, &mx, &my);
     int x = mx + (mode->width - WIN_W) / 2;
@@ -132,7 +133,7 @@ int main() {
     glfwSetWindowPos(window, x, y);
 
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // vsync
+    glfwSwapInterval(1);
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetScrollCallback(window, scroll_callback);
@@ -149,7 +150,7 @@ int main() {
 
     glEnable(GL_DEPTH_TEST);
 
-    // ---- 단위 큐브(원점 기준 -0.5~0.5) : position만 ----
+    // Cube vertices (8) + indices (36)
     float vertices[] = {
         -0.5f, -0.5f, -0.5f,
          0.5f, -0.5f, -0.5f,
@@ -216,40 +217,66 @@ int main() {
     GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
     GLint colorLoc = glGetUniformLocation(shaderProgram, "uColor");
 
-    // ---- 월드 오브젝트(땅/도로/인도/짱구집 대지) ----
+    // World items
     std::vector<RenderItem> items;
 
-    const float groundY = 0.0f;
+    const float groundY = WC::GROUND_Y;
+    const float overlayY = WC::OVERLAY_Y;
+
+    // 1) Grass ground
     items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, groundY, 0.0f), glm::vec3(0.0f), glm::vec3(80.0f, 0.05f, 80.0f)),
-        glm::vec3(0.20f, 0.45f, 0.20f)
+        MakeModel_BottomPivot(glm::vec3(0.0f, groundY, 0.0f), glm::vec3(0.0f),
+                              glm::vec3(WC::GROUND_SIZE, WC::GROUND_THK, WC::GROUND_SIZE)),
+        WC::COL_GRASS
         });
 
-    const float overlayY = groundY + 0.002f;
-
-    const float roadW = 10.0f;
-    const float roadL = 60.0f;
+    // 2) Road
     items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, overlayY, 0.0f), glm::vec3(0.0f), glm::vec3(roadW, 0.03f, roadL)),
-        glm::vec3(0.12f, 0.12f, 0.12f)
+        MakeModel_BottomPivot(glm::vec3(0.0f, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
+                              glm::vec3(WC::ROAD_W, WC::ROAD_THK, WC::ROAD_L)),
+        WC::COL_ROAD
         });
 
-    const float sidewalkW = 6.0f;
-    const float sidewalkL = roadL;
-    {
-        float xLeft = -(roadW * 0.5f + sidewalkW * 0.5f);
-        float xRight = (roadW * 0.5f + sidewalkW * 0.5f);
-        glm::vec3 rot(0.0f);
-        glm::vec3 scale(sidewalkW, 0.12f, sidewalkL);
-
-        items.push_back({ MakeModel_BottomPivot(glm::vec3(xLeft,  overlayY, 0.0f), rot, scale), glm::vec3(0.55f) });
-        items.push_back({ MakeModel_BottomPivot(glm::vec3(xRight, overlayY, 0.0f), rot, scale), glm::vec3(0.55f) });
+    // 2-1) Center dashed line
+    for (int i = -5; i <= 5; i++) {
+        float z = WC::ROAD_Z + i * 10.0f;
+        items.push_back({
+            MakeModel_BottomPivot(glm::vec3(0.0f, overlayY + 0.001f, z), glm::vec3(0.0f),
+                                  glm::vec3(0.5f, 0.01f, 4.0f)),
+            WC::COL_LINE
+            });
     }
 
-    glm::vec3 shinHouseCenter(0.0f, groundY, -12.0f);
+    // 3) Sidewalks
+    float xLeft = -(WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
+    float xRight = +(WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
+
     items.push_back({
-        MakeModel_BottomPivot(glm::vec3(shinHouseCenter.x, overlayY, shinHouseCenter.z), glm::vec3(0.0f), glm::vec3(18.0f, 0.06f, 14.0f)),
-        glm::vec3(0.35f, 0.30f, 0.22f)
+        MakeModel_BottomPivot(glm::vec3(xLeft, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
+                              glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L)),
+        WC::COL_SIDEWALK
+        });
+
+    items.push_back({
+        MakeModel_BottomPivot(glm::vec3(xRight, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
+                              glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L)),
+        WC::COL_SIDEWALK
+        });
+
+    // 4) Shinchan house pivot + yard
+    glm::vec3 shinHouseCenter = WC::SHIN_CENTER;
+
+    items.push_back({
+        MakeModel_BottomPivot(glm::vec3(shinHouseCenter.x, overlayY, shinHouseCenter.z), glm::vec3(0.0f),
+                              glm::vec3(WC::YARD_W, WC::YARD_THK, WC::YARD_L)),
+        WC::COL_YARD
+        });
+
+    // 4-1) Driveway
+    items.push_back({
+        MakeModel_BottomPivot(glm::vec3(0.0f, overlayY, WC::DRIVE_Z), glm::vec3(0.0f),
+                              glm::vec3(WC::DRIVE_W, WC::DRIVE_THK, WC::DRIVE_L)),
+        glm::vec3(0.30f, 0.30f, 0.30f)
         });
 
     float lastFrame = 0.0f;
@@ -270,10 +297,16 @@ int main() {
 
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 200.0f);
 
+        // Use std::sin/std::cos to avoid missing <cmath> issues
+        float cp = (float)std::cos((double)pitch);
+        float sp = (float)std::sin((double)pitch);
+        float cy = (float)std::cos((double)yaw);
+        float sy = (float)std::sin((double)yaw);
+
         glm::vec3 cameraPos;
-        cameraPos.x = shinHouseCenter.x + radius * cosf(pitch) * sinf(yaw);
-        cameraPos.y = shinHouseCenter.y + radius * sinf(pitch);
-        cameraPos.z = shinHouseCenter.z + radius * cosf(pitch) * cosf(yaw);
+        cameraPos.x = shinHouseCenter.x + radius * cp * sy;
+        cameraPos.y = shinHouseCenter.y + radius * sp;
+        cameraPos.z = shinHouseCenter.z + radius * cp * cy;
 
         glm::mat4 view = glm::lookAt(cameraPos, shinHouseCenter, glm::vec3(0, 1, 0));
 
