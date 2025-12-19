@@ -1,10 +1,12 @@
 // main.cpp
 // C++ + OpenGL(3.3) + GLFW + GLAD + GLM
-// 회전하는 3D 정육면체 + PDF의 카메라(yaw/pitch) 완전 반영 버전
+
+// 해더 선언부 추가했습니다
+#include "WorldConfig.h"
+#include "TransformUtils.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
