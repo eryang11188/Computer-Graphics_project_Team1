@@ -1,6 +1,5 @@
-// main.cpp local
-// C++ + OpenGL(3.3) + GLFW + GLAD + GLM
-// Ground/Road/Sidewalk + Orbit Camera + Mouse Wheel Zoom + Borderless Window
+// main.cpp 
+
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -243,9 +242,10 @@ int main() {
     // World items
     std::vector<RenderItem> items;
 
-    //ground
-    const float groundY = WC::GROUND_Y;
+   // ground / overlay
+    const float groundY  = WC::GROUND_Y;
     const float overlayY = WC::OVERLAY_Y;
+
 
     glm::vec3 shinHouseCenter = WC::SHIN_CENTER;
 
@@ -296,7 +296,7 @@ int main() {
        MakeModel_BottomPivot(
            glm::vec3(
                shinHouseCenter.x,
-               WC::GROUND_Y,
+               overlayY,
                shinHouseCenter.z - fenceHalfL
            ),
            glm::vec3(0.0f),
@@ -309,7 +309,7 @@ int main() {
        MakeModel_BottomPivot(
            glm::vec3(
                shinHouseCenter.x - fenceHalfW,
-               WC::GROUND_Y,
+               overlayY,
                shinHouseCenter.z
            ),
            glm::vec3(0.0f),
@@ -322,7 +322,7 @@ int main() {
        MakeModel_BottomPivot(
            glm::vec3(
                shinHouseCenter.x + fenceHalfW,
-               WC::GROUND_Y,
+               overlayY,
                shinHouseCenter.z
            ),
            glm::vec3(0.0f),
@@ -335,7 +335,7 @@ int main() {
      MakeModel_BottomPivot(
          glm::vec3(
              leftCenterX,
-             WC::GROUND_Y,
+             overlayY,
              shinHouseCenter.z + fenceHalfL
          ),
          glm::vec3(0.0f),
@@ -348,7 +348,7 @@ int main() {
       MakeModel_BottomPivot(
           glm::vec3(
               rightCenterX,
-              WC::GROUND_Y,
+              overlayY,
               shinHouseCenter.z + fenceHalfL
           ),
           glm::vec3(0.0f),
@@ -357,12 +357,11 @@ int main() {
       fenceColor
         });
 
-    float pillarW = 0.6f;
-    float pillarH = 2.4f;
+  
 
     items.push_back({
     MakeModel_BottomPivot(
-        glm::vec3(gateLeftX, WC::GROUND_Y, shinHouseCenter.z + fenceHalfL),
+        glm::vec3(gateLeftX, overlayY, shinHouseCenter.z + fenceHalfL),
         glm::vec3(0.0f),
         glm::vec3(pillarW, pillarH, pillarW)
     ),
@@ -371,7 +370,7 @@ int main() {
 
     items.push_back({
     MakeModel_BottomPivot(
-        glm::vec3(gateRightX, WC::GROUND_Y, shinHouseCenter.z + fenceHalfL),
+        glm::vec3(gateRightX, overlayY, shinHouseCenter.z + fenceHalfL),
         glm::vec3(0.0f),
         glm::vec3(pillarW, pillarH, pillarW)
     ),
@@ -405,6 +404,34 @@ int main() {
         ),
         glm::vec3(0.45f, 0.45f, 0.45f)
         });
+
+    // --- 소나무 (계단식 사각뿔 형태) ---
+        glm::vec3 pinePos = shinHouseCenter + glm::vec3(8.0f, 0.0f, 6.0f);
+        pinePos.y = overlayY; 
+        
+        // 1) 나무 기둥 (Brown)
+        items.push_back({
+            MakeModel_BottomPivot(pinePos, glm::vec3(0.0f), glm::vec3(0.7f, 3.5f, 0.7f)),
+            glm::vec3(0.35f, 0.20f, 0.10f)
+            });
+        
+        // 2) 나뭇잎 - 하단
+        items.push_back({
+            MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 2.5f, 0.0f), glm::vec3(0.0f), glm::vec3(4.0f, 1.2f, 4.0f)),
+            WC::COL_GRASS
+            });
+        
+        // 3) 나뭇잎 - 중단
+        items.push_back({
+            MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 3.7f, 0.0f), glm::vec3(0.0f), glm::vec3(2.8f, 1.0f, 2.8f)),
+            WC::COL_GRASS
+            });
+        
+        // 4) 나뭇잎 - 상단
+        items.push_back({
+            MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 4.7f, 0.0f), glm::vec3(0.0f), glm::vec3(1.5f, 1.0f, 1.5f)),
+            WC::COL_GRASS
+            });
 
     float lastFrame = 0.0f;
 
