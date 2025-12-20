@@ -9,6 +9,8 @@
 #include <iostream>
 #include <cmath>
 #include <ctime>
+#include <cstdlib>
+#include <algorithm>
 
 #include "WorldConfig.h"
 #include "TransformUtils.h"
@@ -205,16 +207,17 @@ int main() {
 
     glUseProgram(shaderProgram);
     GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
-    GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
-    GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+    GLint viewLoc  = glGetUniformLocation(shaderProgram, "view");
+    GLint projLoc  = glGetUniformLocation(shaderProgram, "projection");
     GLint colorLoc = glGetUniformLocation(shaderProgram, "uColor");
 
     const float groundY = WC::GROUND_Y;
     const float overlayY = WC::OVERLAY_Y;
     glm::vec3 center = WC::SHIN_CENTER;
 
-    constexpr float YARD_SCALE_W = 2.45f;
-    constexpr float YARD_SCALE_L = 2.00f;
+    // main 기준 유지
+    constexpr float YARD_SCALE_W = 2.40f;
+    constexpr float YARD_SCALE_L = 1.95f;
 
     float yardW = WC::YARD_W * YARD_SCALE_W;
     float yardL = WC::YARD_L * YARD_SCALE_L;
@@ -226,356 +229,390 @@ int main() {
     float fenceLenZ = yardL + WC::FENCE_MARGIN * 2.0f + WC::FENCE_THK;
     float fenceThk = WC::FENCE_THK;
 
-    float yardFullW = fenceHalfW * 2.0f;
-    float yardFullL = fenceHalfL * 2.0f;
+    float gateOffsetX = 4.0f;
+    float gateW = 7.2f;
 
-    float gateOffsetX = 3.5f;
-    float gateW = 6.0f;
-
-    float pillarW = 0.6f;
-    float pillarH = 2.4f;
+    float pillarW = 0.7f;
+    float pillarH = 2.8f;
 
     glm::vec3 fenceColor(0.75f, 0.70f, 0.60f);
 
-    float fenceLeftX = center.x - fenceLenX * 0.5f;
+    float yardFullW = fenceHalfW * 2.0f;
+    float yardFullL = fenceHalfL * 2.0f;
+
+    float fenceLeftX  = center.x - fenceLenX * 0.5f;
     float fenceRightX = center.x + fenceLenX * 0.5f;
 
     float gateCenterX = center.x + gateOffsetX;
-    float gateLeftX = gateCenterX - gateW * 0.5f;
-    float gateRightX = gateCenterX + gateW * 0.5f;
+    float gateLeftX   = gateCenterX - gateW * 0.5f;
+    float gateRightX  = gateCenterX + gateW * 0.5f;
 
-    float leftLen = gateLeftX - fenceLeftX;
+    float leftLen  = gateLeftX - fenceLeftX;
     float rightLen = fenceRightX - gateRightX;
 
-    float leftCenterX = fenceLeftX + leftLen * 0.5f;
+    float leftCenterX  = fenceLeftX + leftLen * 0.5f;
     float rightCenterX = gateRightX + rightLen * 0.5f;
 
     std::vector<RenderItem> items;
 
-    auto AddBox = [&](glm::vec3 pos, glm::vec3 euler, glm::vec3 scl, glm::vec3 col, bool bottomPivot) {
-        items.push_back({ bottomPivot ? MakeModel_BottomPivot(pos, euler, scl) : MakeModel_CenterPivot(pos, euler, scl), col });
-        };
+    auto AddBottom = [&](glm::vec3 pos, glm::vec3 euler, glm::vec3 scl, glm::vec3 col) {
+        items.push_back({ MakeModel_BottomPivot(pos, euler, scl), col });
+    };
+    auto AddCenter = [&](glm::vec3 pos, glm::vec3 euler, glm::vec3 scl, glm::vec3 col) {
+        items.push_back({ MakeModel_CenterPivot(pos, euler, scl), col });
+    };
 
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, groundY, 0.0f), glm::vec3(0.0f),
-                              glm::vec3(WC::GROUND_SIZE, WC::GROUND_THK, WC::GROUND_SIZE)),
-        WC::COL_GRASS
-        });
+    // 바닥/마당/담장/기둥/진입로 (main 유지)
+    AddBottom(glm::vec3(0.0f, groundY, 0.0f), glm::vec3(0.0f),
+              glm::vec3(WC::GROUND_SIZE, WC::GROUND_THK, WC::GROUND_SIZE),
+              WC::COL_GRASS);
 
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(center.x, overlayY, center.z), glm::vec3(0.0f),
-                              glm::vec3(yardFullW, WC::YARD_THK, yardFullL)),
-        WC::COL_YARD
-        });
+    AddBottom(glm::vec3(center.x, overlayY, center.z), glm::vec3(0.0f),
+              glm::vec3(yardFullW, WC::YARD_THK, yardFullL),
+              WC::COL_YARD);
 
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(center.x, overlayY, center.z - fenceHalfL), glm::vec3(0.0f),
-                              glm::vec3(fenceLenX, WC::FENCE_H, WC::FENCE_THK)),
-        fenceColor
-        });
+    AddBottom(glm::vec3(center.x, overlayY, center.z - fenceHalfL), glm::vec3(0.0f),
+              glm::vec3(fenceLenX, WC::FENCE_H, WC::FENCE_THK),
+              fenceColor);
 
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(center.x - fenceHalfW, overlayY, center.z), glm::vec3(0.0f),
-                              glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ)),
-        fenceColor
-        });
+    AddBottom(glm::vec3(center.x - fenceHalfW, overlayY, center.z), glm::vec3(0.0f),
+              glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ),
+              fenceColor);
 
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(center.x + fenceHalfW, overlayY, center.z), glm::vec3(0.0f),
-                              glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ)),
-        fenceColor
-        });
+    AddBottom(glm::vec3(center.x + fenceHalfW, overlayY, center.z), glm::vec3(0.0f),
+              glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ),
+              fenceColor);
 
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(leftCenterX, overlayY, center.z + fenceHalfL), glm::vec3(0.0f),
-                              glm::vec3(leftLen, WC::FENCE_H, fenceThk)),
-        fenceColor
-        });
+    AddBottom(glm::vec3(leftCenterX, overlayY, center.z + fenceHalfL), glm::vec3(0.0f),
+              glm::vec3(leftLen, WC::FENCE_H, fenceThk),
+              fenceColor);
 
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(rightCenterX, overlayY, center.z + fenceHalfL), glm::vec3(0.0f),
-                              glm::vec3(rightLen, WC::FENCE_H, fenceThk)),
-        fenceColor
-        });
+    AddBottom(glm::vec3(rightCenterX, overlayY, center.z + fenceHalfL), glm::vec3(0.0f),
+              glm::vec3(rightLen, WC::FENCE_H, fenceThk),
+              fenceColor);
 
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(gateLeftX, overlayY, center.z + fenceHalfL), glm::vec3(0.0f),
-                              glm::vec3(pillarW, pillarH, pillarW)),
-        glm::vec3(0.70f, 0.60f, 0.50f)
-        });
+    AddBottom(glm::vec3(gateLeftX, overlayY, center.z + fenceHalfL), glm::vec3(0.0f),
+              glm::vec3(pillarW, pillarH, pillarW),
+              glm::vec3(0.70f, 0.60f, 0.50f));
 
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(gateRightX, overlayY, center.z + fenceHalfL), glm::vec3(0.0f),
-                              glm::vec3(pillarW, pillarH, pillarW)),
-        glm::vec3(0.70f, 0.60f, 0.50f)
-        });
+    AddBottom(glm::vec3(gateRightX, overlayY, center.z + fenceHalfL), glm::vec3(0.0f),
+              glm::vec3(pillarW, pillarH, pillarW),
+              glm::vec3(0.70f, 0.60f, 0.50f));
 
     float driveW = gateW;
-    float driveL = 12.0f;
+    float driveL = 15.0f;
 
     float frontFenceCenterZ = center.z + fenceHalfL;
-    float frontFenceOuterZ = frontFenceCenterZ + fenceThk * 0.5f;
-    float driveCenterZ = frontFenceOuterZ + driveL * 0.5f;
+    float frontFenceOuterZ  = frontFenceCenterZ + fenceThk * 0.5f;
+    float driveCenterZ      = frontFenceOuterZ + driveL * 0.5f;
 
-    AddBox(glm::vec3(gateCenterX, overlayY, driveCenterZ), glm::vec3(0.0f),
-        glm::vec3(driveW, WC::DRIVE_THK, driveL), glm::vec3(0.45f, 0.45f, 0.45f), true);
+    AddBottom(glm::vec3(gateCenterX, overlayY, driveCenterZ), glm::vec3(0.0f),
+              glm::vec3(driveW, WC::DRIVE_THK, driveL),
+              glm::vec3(0.45f, 0.45f, 0.45f));
 
+    // 소나무 (main 유지)
     auto AddPine = [&](glm::vec3 base, float trunkH, float trunkW, glm::vec3 leafColor) {
         base.y = overlayY;
 
-        AddBox(base, glm::vec3(0.0f), glm::vec3(trunkW, trunkH, trunkW), glm::vec3(0.35f, 0.22f, 0.12f), true);
+        AddBottom(base, glm::vec3(0.0f),
+                  glm::vec3(trunkW, trunkH, trunkW),
+                  glm::vec3(0.35f, 0.22f, 0.12f));
 
         float y1 = trunkH * 0.65f;
         float y2 = trunkH * 0.95f;
         float y3 = trunkH * 1.20f;
 
-        AddBox(base + glm::vec3(0.0f, y1, 0.0f), glm::vec3(0.0f),
-            glm::vec3(trunkW * 6.2f, trunkH * 0.35f, trunkW * 6.2f), leafColor, true);
+        AddBottom(base + glm::vec3(0.0f, y1, 0.0f), glm::vec3(0.0f),
+                  glm::vec3(trunkW * 6.2f, trunkH * 0.35f, trunkW * 6.2f),
+                  leafColor);
 
-        AddBox(base + glm::vec3(0.0f, y2, 0.0f), glm::vec3(0.0f),
-            glm::vec3(trunkW * 4.4f, trunkH * 0.30f, trunkW * 4.4f), leafColor * 0.95f, true);
+        AddBottom(base + glm::vec3(0.0f, y2, 0.0f), glm::vec3(0.0f),
+                  glm::vec3(trunkW * 4.4f, trunkH * 0.30f, trunkW * 4.4f),
+                  leafColor * 0.95f);
 
-        AddBox(base + glm::vec3(0.0f, y3, 0.0f), glm::vec3(0.0f),
-            glm::vec3(trunkW * 2.7f, trunkH * 0.28f, trunkW * 2.7f), leafColor * 0.90f, true);
-        };
+        AddBottom(base + glm::vec3(0.0f, y3, 0.0f), glm::vec3(0.0f),
+                  glm::vec3(trunkW * 2.8f, trunkH * 0.28f, trunkW * 2.8f),
+                  leafColor * 0.90f);
+    };
 
     glm::vec3 leafA(0.18f, 0.45f, 0.22f);
     glm::vec3 leafB(0.15f, 0.38f, 0.20f);
     glm::vec3 leafC(0.20f, 0.52f, 0.25f);
 
-    float outZ1 = center.z + fenceHalfL + 7.0f;
-    float outZ2 = center.z + fenceHalfL + 18.0f;
+    float outZ1 = center.z + fenceHalfL + 9.0f;
+    float outZ2 = center.z + fenceHalfL + 22.0f;
 
-    float outXR = center.x + fenceHalfW + 12.0f;
-    float outXL = center.x - fenceHalfW - 12.0f;
+    float outXR = center.x + fenceHalfW + 13.0f;
+    float outXL = center.x - fenceHalfW - 13.0f;
 
-    AddPine(glm::vec3(outXR, overlayY, outZ1), 5.2f, 0.80f, leafA);
-    AddPine(glm::vec3(outXR + 5.0f, overlayY, outZ2), 6.0f, 0.88f, leafB);
-    AddPine(glm::vec3(outXR - 6.0f, overlayY, outZ2 + 4.0f), 5.6f, 0.84f, leafC);
+    AddPine(glm::vec3(outXR, overlayY, outZ1), 5.6f, 0.85f, leafA);
+    AddPine(glm::vec3(outXR + 5.5f, overlayY, outZ2), 6.3f, 0.92f, leafB);
+    AddPine(glm::vec3(outXR - 6.8f, overlayY, outZ2 + 4.2f), 6.0f, 0.88f, leafC);
 
-    AddPine(glm::vec3(outXL, overlayY, outZ1 + 2.2f), 5.6f, 0.84f, leafB);
-    AddPine(glm::vec3(outXL - 5.0f, overlayY, outZ2 + 1.2f), 6.2f, 0.90f, leafA);
+    AddPine(glm::vec3(outXL, overlayY, outZ1 + 2.4f), 6.0f, 0.90f, leafB);
+    AddPine(glm::vec3(outXL - 5.8f, overlayY, outZ2 + 1.8f), 6.8f, 0.98f, leafA);
 
+    // main 집/차고 블록(그대로 유지)
     glm::vec3 colBase(0.55f, 0.45f, 0.35f);
-    glm::vec3 colWall(0.85f, 0.80f, 0.70f);
-    glm::vec3 colPorch(0.78f, 0.72f, 0.62f);
-    glm::vec3 colDoor(0.28f, 0.16f, 0.10f);
+    glm::vec3 colWall(0.86f, 0.82f, 0.72f);
+    glm::vec3 colTrim(0.93f, 0.93f, 0.93f);
+    glm::vec3 colDoor(0.30f, 0.18f, 0.10f);
     glm::vec3 colWindow(0.65f, 0.80f, 0.95f);
-    glm::vec3 colFrame(0.92f, 0.92f, 0.92f);
-    glm::vec3 colRoof(0.65f, 0.18f, 0.18f);
+    glm::vec3 colRoof(0.70f, 0.20f, 0.20f);
+    glm::vec3 colWood(0.78f, 0.72f, 0.62f);
     glm::vec3 colChim(0.35f, 0.22f, 0.16f);
+    glm::vec3 colRail(0.85f, 0.85f, 0.85f);
 
-    float H_wallW = 18.0f;
-    float H_wallH = 7.6f;
-    float H_wallD = 13.2f;
+    auto AddBox = [&](glm::vec3 pos, glm::vec3 euler, glm::vec3 scl, glm::vec3 col, bool bottomPivot) {
+        if (bottomPivot) items.push_back({ MakeModel_BottomPivot(pos, euler, scl), col });
+        else items.push_back({ MakeModel_CenterPivot(pos, euler, scl), col });
+    };
 
-    float H_baseY = overlayY + WC::YARD_THK;
-    float H_baseH = 0.70f;
-    float H_wallY = H_baseY + H_baseH;
+    auto AddHipRoof = [&](glm::vec3 roofCenter, float roofW, float roofD, float pitchRad, float thk, glm::vec3 col) {
+        float offX = roofW * 0.22f;
+        float offZ = roofD * 0.22f;
 
-    glm::vec3 H_center;
-    H_center.x = gateCenterX - H_wallW * 0.22f;
-    H_center.y = 0.0f;
-    H_center.z = center.z - yardL * 0.08f;
+        AddBox(roofCenter + glm::vec3(-offX, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, +pitchRad),
+               glm::vec3(roofW * 0.62f, thk, roofD), col, false);
 
-    AddBox(glm::vec3(H_center.x, H_baseY, H_center.z), glm::vec3(0.0f),
-        glm::vec3(H_wallW + 2.0f, H_baseH, H_wallD + 2.0f), colBase, true);
+        AddBox(roofCenter + glm::vec3(+offX, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -pitchRad),
+               glm::vec3(roofW * 0.62f, thk, roofD), col, false);
 
-    AddBox(glm::vec3(H_center.x, H_wallY, H_center.z), glm::vec3(0.0f),
-        glm::vec3(H_wallW, H_wallH, H_wallD), colWall, true);
+        AddBox(roofCenter + glm::vec3(0.0f, 0.0f, +offZ), glm::vec3(-pitchRad, 0.0f, 0.0f),
+               glm::vec3(roofW, thk, roofD * 0.62f), col, false);
 
-    float H_frontZ = H_center.z + H_wallD * 0.5f;
-    float H_backZ = H_center.z - H_wallD * 0.5f;
+        AddBox(roofCenter + glm::vec3(0.0f, 0.0f, -offZ), glm::vec3(+pitchRad, 0.0f, 0.0f),
+               glm::vec3(roofW, thk, roofD * 0.62f), col, false);
 
-    glm::vec3 H_porch = H_center + glm::vec3(H_wallW * 0.22f, 0.0f, H_wallD * 0.5f - 2.2f);
-    AddBox(glm::vec3(H_porch.x, H_wallY, H_porch.z), glm::vec3(0.0f),
-        glm::vec3(7.2f, 4.6f, 4.4f), colPorch, true);
+        AddBox(roofCenter + glm::vec3(0.0f, 0.12f, 0.0f), glm::vec3(0.0f),
+               glm::vec3(roofW * 0.10f, 0.14f, roofD * 0.10f), col * 0.92f, false);
+    };
 
-    float stepH = 0.28f;
-    float stepD = 0.88f;
-    float stepW = 3.4f;
-    float stepStartZ = H_frontZ + 0.35f;
-
-    AddBox(glm::vec3(H_porch.x, H_baseY, stepStartZ), glm::vec3(0.0f),
-        glm::vec3(stepW, stepH, stepD), colBase, true);
-    AddBox(glm::vec3(H_porch.x, H_baseY + stepH, stepStartZ + stepD), glm::vec3(0.0f),
-        glm::vec3(stepW, stepH, stepD), colBase, true);
-    AddBox(glm::vec3(H_porch.x, H_baseY + stepH * 2.0f, stepStartZ + stepD * 2.0f), glm::vec3(0.0f),
-        glm::vec3(stepW, stepH, stepD), colBase, true);
-
-    float doorW = 2.2f;
-    float doorH = 4.4f;
-    float doorT = 0.22f;
-    float doorZ = H_frontZ + 0.10f;
-
-    AddBox(glm::vec3(H_porch.x, H_wallY, doorZ), glm::vec3(0.0f),
-        glm::vec3(doorW, doorH, doorT), colDoor, true);
-
-    AddBox(glm::vec3(H_porch.x + doorW * 0.30f, H_wallY + doorH * 0.55f, doorZ + 0.08f), glm::vec3(0.0f),
-        glm::vec3(0.20f, 0.20f, 0.20f), colFrame, false);
-
-    AddBox(glm::vec3(H_porch.x, H_wallY + doorH + 0.18f, doorZ - 0.55f), glm::vec3(0.0f),
-        glm::vec3(3.4f, 0.26f, 1.6f), colRoof * 0.92f, true);
-
-    float winW = 2.8f;
-    float winH = 1.8f;
-    float winT = 0.16f;
-    float winY = H_wallY + 3.1f;
-    float winZ = H_frontZ + 0.12f;
-
-    float frameT = 0.12f;
-    float frameWpad = 0.34f;
-    float frameHpad = 0.26f;
-
-    auto AddWindow = [&](float cx) {
-        AddBox(glm::vec3(cx, winY, winZ), glm::vec3(0.0f),
-            glm::vec3(winW, winH, winT), colWindow, true);
-
-        AddBox(glm::vec3(cx, winY + winH - frameHpad * 0.5f, winZ + 0.08f), glm::vec3(0.0f),
-            glm::vec3(winW + frameWpad, frameHpad, frameT), colFrame, true);
-
-        AddBox(glm::vec3(cx, winY + frameHpad * 0.5f, winZ + 0.08f), glm::vec3(0.0f),
-            glm::vec3(winW + frameWpad, frameHpad, frameT), colFrame, true);
-
-        AddBox(glm::vec3(cx - (winW * 0.5f) - frameWpad * 0.25f, winY + winH * 0.5f, winZ + 0.08f), glm::vec3(0.0f),
-            glm::vec3(frameHpad, winH + frameHpad * 0.2f, frameT), colFrame, true);
-
-        AddBox(glm::vec3(cx + (winW * 0.5f) + frameWpad * 0.25f, winY + winH * 0.5f, winZ + 0.08f), glm::vec3(0.0f),
-            glm::vec3(frameHpad, winH + frameHpad * 0.2f, frameT), colFrame, true);
-
-        AddBox(glm::vec3(cx, winY + winH * 0.5f, winZ + 0.10f), glm::vec3(0.0f),
-            glm::vec3(winW + 0.10f, 0.12f, frameT * 0.9f), colFrame, true);
-
-        AddBox(glm::vec3(cx, winY + winH * 0.5f, winZ + 0.10f), glm::vec3(0.0f),
-            glm::vec3(0.12f, winH + 0.10f, frameT * 0.9f), colFrame, true);
-        };
-
-    AddWindow(H_center.x - 4.8f);
-    AddWindow(H_center.x + 0.6f);
-
-    float pathW = 2.6f;
-    float pathT = WC::DRIVE_THK;
-    float pathStartZ = frontFenceCenterZ - 0.30f;
-    float pathEndZ = H_frontZ - 1.6f;
-    float pathLen = std::max(2.0f, pathStartZ - pathEndZ);
-    float pathCenterZ = (pathStartZ + pathEndZ) * 0.5f;
-
-    AddBox(glm::vec3(gateCenterX, overlayY, pathCenterZ), glm::vec3(0.0f),
-        glm::vec3(pathW, pathT, pathLen), glm::vec3(0.50f, 0.50f, 0.50f), true);
-
-    AddBox(glm::vec3(gateCenterX, overlayY, pathEndZ - 0.8f), glm::vec3(0.0f),
-        glm::vec3(3.2f, pathT, 2.2f), glm::vec3(0.52f, 0.52f, 0.52f), true);
-
-    float roofTilt = glm::radians(33.0f);
-    float roofThk = 0.28f;
-    float roofRise = 2.10f;
-
-    float roofOverX = 1.35f;
-    float roofOverZ = 1.60f;
-
-    float roofCenterY = H_wallY + H_wallH + roofRise;
-    float roofOffsetX = (H_wallW * 0.30f);
-
-    float roofLenZ = H_wallD + roofOverZ * 2.0f;
-    float roofPanelW = H_wallW * 0.80f + roofOverX;
-
-    AddBox(glm::vec3(H_center.x - roofOffsetX, roofCenterY, H_center.z),
-        glm::vec3(0.0f, 0.0f, +roofTilt),
-        glm::vec3(roofPanelW, roofThk, roofLenZ),
-        colRoof, false);
-
-    AddBox(glm::vec3(H_center.x + roofOffsetX, roofCenterY, H_center.z),
-        glm::vec3(0.0f, 0.0f, -roofTilt),
-        glm::vec3(roofPanelW, roofThk, roofLenZ),
-        colRoof, false);
-
-    AddBox(glm::vec3(H_center.x, roofCenterY + 0.03f, H_center.z),
-        glm::vec3(0.0f),
-        glm::vec3(H_wallW * 0.08f, 0.08f, roofLenZ * 0.98f),
-        colRoof * 0.90f, false);
-
-    AddBox(glm::vec3(H_center.x - 5.2f, H_wallY + H_wallH + 0.55f, H_center.z - 2.2f),
-        glm::vec3(0.0f),
-        glm::vec3(1.30f, 3.8f, 1.30f),
-        colChim, true);
-
-    glm::vec3 cloudColor(0.95f, 0.95f, 0.97f);
-
-    float cloudY = overlayY + 30.0f;
-
-    auto AddCloud = [&](glm::vec3 c, float s)
-        {
-            items.push_back({
-                MakeModel_CenterPivot(c, glm::vec3(0.0f),
-                    glm::vec3(10.0f * s, 2.5f * s, 6.0f * s)),
-                cloudColor
-                });
-            items.push_back({
-                MakeModel_CenterPivot(c + glm::vec3(-4.0f * s, 0.8f * s, 0.0f), glm::vec3(0.0f),
-                    glm::vec3(7.0f * s, 2.0f * s, 5.0f * s)),
-                cloudColor
-                });
-
-            items.push_back({
-                MakeModel_CenterPivot(c + glm::vec3(4.5f * s, 0.4f * s, -1.0f * s), glm::vec3(0.0f),
-                    glm::vec3(6.5f * s, 1.8f * s, 4.8f * s)),
-                cloudColor
-                });
-
-            items.push_back({
-                MakeModel_CenterPivot(c + glm::vec3(0.0f * s, -0.4f * s, 2.0f * s), glm::vec3(0.0f),
-                    glm::vec3(8.0f * s, 1.6f * s, 5.8f * s)),
-                cloudColor
-                });
-        };
-
-    int cloudCount = 15;
-    float halfGround = WC::GROUND_SIZE * 0.5f - 10.0f;
-
-    glm::vec3 grassColor(0.18f, 0.45f, 0.18f);
-
-    int grassPatchCount = 70;
-
-    float halfGround = WC::GROUND_SIZE * 0.5f;
-
-    for (int i = 0; i < grassPatchCount; ++i)
     {
-        float patchMargin = 2.0f;
+        glm::vec3 Hc = center + glm::vec3(-yardW * 0.08f, 0.0f, -yardL * 0.10f);
 
-        float x = (rand() % (int)((halfGround - patchMargin) * 2)
-            - (halfGround - patchMargin));
-        float z = (rand() % (int)((halfGround - patchMargin) * 2)
-            - (halfGround - patchMargin));
+        float slabY = overlayY + WC::YARD_THK;
+        float slabH = 0.60f;
 
-        if (abs(x - H_center.x) < WC::YARD_W * 0.6f &&
-            abs(z - H_center.z) < WC::YARD_L * 0.6f)
-            continue;
+        float W1 = 19.0f;
+        float H1 = 4.4f;
+        float D1 = 13.6f;
 
-        float w = 1.8f + (rand() % 20) / 10.0f;
-        float l = 1.8f + (rand() % 20) / 10.0f;
+        float W2 = 15.2f;
+        float H2 = 3.6f;
+        float D2 = 11.0f;
 
-        float g = 0.40f + (rand() % 20) / 100.0f;
-        glm::vec3 grassColor(0.18f, g, 0.18f);
+        AddBox(glm::vec3(Hc.x, slabY, Hc.z), glm::vec3(0.0f),
+               glm::vec3(W1 + 2.4f, slabH, D1 + 2.2f), colBase, true);
 
-        items.push_back({
-            MakeModel_BottomPivot(
-                glm::vec3(x, overlayY + 0.001f, z),
-                glm::vec3(0.0f),
-                glm::vec3(w, 0.02f, l)
-            ),
-            grassColor
+        float f1Y = slabY + slabH;
+        AddBox(glm::vec3(Hc.x, f1Y, Hc.z), glm::vec3(0.0f),
+               glm::vec3(W1, H1, D1), colWall, true);
+
+        glm::vec3 H2c = Hc + glm::vec3(-0.6f, 0.0f, -1.2f);
+        float f2Y = f1Y + H1;
+        AddBox(glm::vec3(H2c.x, f2Y, H2c.z), glm::vec3(0.0f),
+               glm::vec3(W2, H2, D2), colWall, true);
+
+        float frontZ1 = Hc.z + D1 * 0.5f;
+
+        glm::vec3 porch = Hc + glm::vec3(W1 * 0.20f, 0.0f, D1 * 0.5f - 2.4f);
+        AddBox(glm::vec3(porch.x, f1Y, porch.z), glm::vec3(0.0f),
+               glm::vec3(7.2f, 3.8f, 4.0f), colWood, true);
+
+        float stepH = 0.28f;
+        float stepD = 0.85f;
+        float stepW = 3.4f;
+        float stepStartZ = frontZ1 + 0.40f;
+
+        AddBox(glm::vec3(porch.x, slabY, stepStartZ), glm::vec3(0.0f),
+               glm::vec3(stepW, stepH, stepD), colBase, true);
+        AddBox(glm::vec3(porch.x, slabY + stepH, stepStartZ + stepD), glm::vec3(0.0f),
+               glm::vec3(stepW, stepH, stepD), colBase, true);
+        AddBox(glm::vec3(porch.x, slabY + stepH * 2.0f, stepStartZ + stepD * 2.0f), glm::vec3(0.0f),
+               glm::vec3(stepW, stepH, stepD), colBase, true);
+
+        float doorW = 1.9f;
+        float doorH = 3.9f;
+        float doorT = 0.22f;
+        AddBox(glm::vec3(porch.x, f1Y, frontZ1 + 0.12f), glm::vec3(0.0f),
+               glm::vec3(doorW, doorH, doorT), colDoor, true);
+
+        AddBox(glm::vec3(porch.x + doorW * 0.30f, f1Y + doorH * 0.55f, frontZ1 + 0.20f), glm::vec3(0.0f),
+               glm::vec3(0.16f, 0.16f, 0.16f), colTrim, false);
+
+        float winW = 2.6f;
+        float winH = 1.7f;
+        float winT = 0.16f;
+        float winY = f1Y + 2.7f;
+        float winZ = frontZ1 + 0.12f;
+
+        float frameT = 0.12f;
+        float frameWpad = 0.30f;
+        float frameHpad = 0.22f;
+
+        auto AddWindow = [&](float cx, float cy, float cz) {
+            AddBox(glm::vec3(cx, cy, cz), glm::vec3(0.0f),
+                   glm::vec3(winW, winH, winT), colWindow, true);
+
+            AddBox(glm::vec3(cx, cy + winH - frameHpad * 0.5f, cz + 0.08f), glm::vec3(0.0f),
+                   glm::vec3(winW + frameWpad, frameHpad, frameT), colTrim, true);
+
+            AddBox(glm::vec3(cx, cy + frameHpad * 0.5f, cz + 0.08f), glm::vec3(0.0f),
+                   glm::vec3(winW + frameWpad, frameHpad, frameT), colTrim, true);
+
+            AddBox(glm::vec3(cx - (winW * 0.5f) - frameWpad * 0.25f, cy + winH * 0.5f, cz + 0.08f), glm::vec3(0.0f),
+                   glm::vec3(frameHpad, winH + frameHpad * 0.2f, frameT), colTrim, true);
+
+            AddBox(glm::vec3(cx + (winW * 0.5f) + frameWpad * 0.25f, cy + winH * 0.5f, cz + 0.08f), glm::vec3(0.0f),
+                   glm::vec3(frameHpad, winH + frameHpad * 0.2f, frameT), colTrim, true);
+
+            AddBox(glm::vec3(cx, cy + winH * 0.5f, cz + 0.10f), glm::vec3(0.0f),
+                   glm::vec3(winW + 0.10f, 0.12f, frameT * 0.9f), colTrim, true);
+
+            AddBox(glm::vec3(cx, cy + winH * 0.5f, cz + 0.10f), glm::vec3(0.0f),
+                   glm::vec3(0.12f, winH + 0.10f, frameT * 0.9f), colTrim, true);
+        };
+
+        AddWindow(Hc.x - 5.2f, winY, winZ);
+        AddWindow(Hc.x + 0.0f, winY, winZ);
+
+        float f2FrontZ = H2c.z + D2 * 0.5f;
+        float f2WinY = f2Y + 2.0f;
+        AddBox(glm::vec3(H2c.x + 3.2f, f2WinY, f2FrontZ + 0.12f), glm::vec3(0.0f),
+               glm::vec3(1.4f, 1.9f, 0.16f), colWindow, true);
+
+        float canopyY = f2Y - 0.05f;
+        float canopyW = W2 + 5.0f;
+        float canopyD = D2 + 4.2f;
+        constexpr float canopyPitch = glm::radians(14.0f);
+
+        glm::vec3 canopyCenter(H2c.x + 0.6f, canopyY + 0.9f, H2c.z + 1.4f);
+        AddHipRoof(canopyCenter, canopyW, canopyD, canopyPitch, 0.26f, colRoof);
+
+        float balY = f2Y + 0.60f;
+        float balH = 1.05f;
+        float balZ = H2c.z + D2 * 0.5f - 0.55f;
+        float balW = W2 * 0.72f;
+
+        AddBox(glm::vec3(H2c.x - 0.4f, balY, balZ), glm::vec3(0.0f),
+               glm::vec3(balW, 0.18f, 0.18f), colRail, true);
+
+        AddBox(glm::vec3(H2c.x - 0.4f - balW * 0.5f, balY, balZ - 0.8f), glm::vec3(0.0f),
+               glm::vec3(0.18f, balH, 1.8f), colRail, true);
+
+        AddBox(glm::vec3(H2c.x - 0.4f + balW * 0.5f, balY, balZ - 0.8f), glm::vec3(0.0f),
+               glm::vec3(0.18f, balH, 1.8f), colRail, true);
+
+        AddBox(glm::vec3(H2c.x - 0.4f, balY + balH - 0.12f, balZ - 0.8f), glm::vec3(0.0f),
+               glm::vec3(balW + 0.36f, 0.18f, 1.8f), colRail, true);
+
+        float roofBaseY = f2Y + H2;
+        glm::vec3 roofCenter(H2c.x, roofBaseY + 1.2f, H2c.z);
+        constexpr float roofPitch = glm::radians(24.0f);
+        AddHipRoof(roofCenter, W2 + 6.2f, D2 + 6.2f, roofPitch, 0.30f, colRoof);
+
+        AddBox(glm::vec3(roofCenter.x - 4.8f, roofBaseY + 0.6f, roofCenter.z - 2.2f), glm::vec3(0.0f),
+               glm::vec3(1.35f, 3.8f, 1.35f), colChim, true);
+
+        glm::vec3 carCenter = Hc + glm::vec3(W1 * 0.60f + 4.8f, 0.0f, D1 * 0.18f);
+        float carBaseY = slabY + slabH;
+        float carH = 2.9f;
+
+        AddBox(glm::vec3(carCenter.x, carBaseY, carCenter.z), glm::vec3(0.0f),
+               glm::vec3(7.4f, 0.40f, 6.8f), colBase, true);
+
+        AddBox(glm::vec3(carCenter.x - 3.2f, carBaseY, carCenter.z + 2.8f), glm::vec3(0.0f),
+               glm::vec3(0.45f, carH, 0.45f), colWood * 0.90f, true);
+
+        AddBox(glm::vec3(carCenter.x - 3.2f, carBaseY, carCenter.z - 2.8f), glm::vec3(0.0f),
+               glm::vec3(0.45f, carH, 0.45f), colWood * 0.90f, true);
+
+        AddBox(glm::vec3(carCenter.x + 3.2f, carBaseY, carCenter.z + 2.8f), glm::vec3(0.0f),
+               glm::vec3(0.45f, carH, 0.45f), colWood * 0.90f, true);
+
+        AddBox(glm::vec3(carCenter.x + 3.2f, carBaseY, carCenter.z - 2.8f), glm::vec3(0.0f),
+               glm::vec3(0.45f, carH, 0.45f), colWood * 0.90f, true);
+
+        glm::vec3 carRoofCenter(carCenter.x, carBaseY + carH + 0.35f, carCenter.z);
+        constexpr float carPitch = glm::radians(12.0f);
+        AddHipRoof(carRoofCenter, 8.2f, 7.6f, carPitch, 0.26f, colRoof);
+    }
+
+    // ====== 여기부터: "잔디 + 구름"만 추가(집 코드는 건드리지 않음) ======
+    {
+        // 1) 구름
+        glm::vec3 cloudColor(0.95f, 0.95f, 0.97f);
+        float cloudY = overlayY + 30.0f;
+
+        auto AddCloud = [&](glm::vec3 c, float s) {
+            AddCenter(c, glm::vec3(0.0f),
+                      glm::vec3(10.0f * s, 2.5f * s, 6.0f * s),
+                      cloudColor);
+
+            AddCenter(c + glm::vec3(-4.0f * s, 0.8f * s, 0.0f), glm::vec3(0.0f),
+                      glm::vec3(7.0f * s, 2.0f * s, 5.0f * s),
+                      cloudColor);
+
+            AddCenter(c + glm::vec3(4.5f * s, 0.4f * s, -1.0f * s), glm::vec3(0.0f),
+                      glm::vec3(6.5f * s, 1.8f * s, 4.8f * s),
+                      cloudColor);
+
+            AddCenter(c + glm::vec3(0.0f, -0.4f * s, 2.0f * s), glm::vec3(0.0f),
+                      glm::vec3(8.0f * s, 1.6f * s, 5.8f * s),
+                      cloudColor);
+        };
+
+        int cloudCount = 15;
+        float halfGroundCloud = WC::GROUND_SIZE * 0.5f - 10.0f;
+
+        for (int i = 0; i < cloudCount; ++i) {
+            float rx = (float)(rand() % (int)(halfGroundCloud * 2.0f) - (int)halfGroundCloud);
+            float rz = (float)(rand() % (int)(halfGroundCloud * 2.0f) - (int)halfGroundCloud);
+
+            float x = center.x + rx;
+            float z = center.z + rz;
+
+            float y = cloudY + (float)(rand() % 7 - 3);
+            float s = 0.8f + (float)(rand() % 60) / 100.0f;
+
+            AddCloud(glm::vec3(x, y, z), s);
+        }
+
+        // 2) 잔디 패치(월드 바닥에 랜덤)
+        int grassPatchCount = 70;
+        float halfGround = WC::GROUND_SIZE * 0.5f;
+
+        for (int i = 0; i < grassPatchCount; ++i) {
+            float patchMargin = 2.0f;
+
+            float rx = (float)(rand() % (int)((halfGround - patchMargin) * 2.0f) - (int)(halfGround - patchMargin));
+            float rz = (float)(rand() % (int)((halfGround - patchMargin) * 2.0f) - (int)(halfGround - patchMargin));
+
+            float gx = rx;
+            float gz = rz;
+
+            // 마당(펜스 안쪽) 근처는 비워두기: center + yardW/yardL 기준(집 변수 의존 X)
+            if (std::abs(gx - center.x) < yardW * 0.55f &&
+                std::abs(gz - center.z) < yardL * 0.55f) {
+                continue;
+            }
+
+            float w = 1.8f + (float)(rand() % 20) / 10.0f;
+            float l = 1.8f + (float)(rand() % 20) / 10.0f;
+
+            float g = 0.40f + (float)(rand() % 20) / 100.0f;
+            glm::vec3 grassColor(0.18f, g, 0.18f);
+
+            items.push_back({
+                MakeModel_BottomPivot(glm::vec3(gx, overlayY + 0.001f, gz),
+                                      glm::vec3(0.0f),
+                                      glm::vec3(w, 0.02f, l)),
+                grassColor
             });
+        }
     }
-
-    for (int i = 0; i < cloudCount; ++i)
-    {
-        float x = H_center.x + (rand() % (int)(halfGround * 2) - halfGround);
-        float z = H_center.z + (rand() % (int)(halfGround * 2) - halfGround);
-        float y = cloudY + (rand() % 7 - 3);
-        float s = 0.8f + (rand() % 60) / 100.0f;
-
-        AddCloud(glm::vec3(x, y, z), s);
-    }
+    // ====== 잔디 + 구름 추가 끝 ======
 
     float lastFrame = 0.0f;
 
@@ -612,7 +649,7 @@ int main() {
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
         glBindVertexArray(VAO);
-        for (const auto& it : items) {
+              for (const auto& it : items) {
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(it.model));
             glUniform3fv(colorLoc, 1, glm::value_ptr(it.color));
             glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
@@ -627,6 +664,8 @@ int main() {
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     glDeleteProgram(shaderProgram);
+
     glfwTerminate();
     return 0;
 }
+
