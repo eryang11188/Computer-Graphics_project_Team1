@@ -230,38 +230,44 @@ int main() {
         WC::COL_GRASS
         });
 
-    // 2) Road
+
+    // 도로를 마당 옆으로 옮기기 위한 X 오프셋 계산
+    // 마당 너비(YARD_W)의 절반 + 도로 너비(ROAD_W)의 절반
+    float roadXOffset = (WC::YARD_W * 0.5f) + (WC::ROAD_W * 0.5f);
+
+    // 2) Road (위치 수정: 0.0f -> roadXOffset)
     items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
+        MakeModel_BottomPivot(glm::vec3(roadXOffset, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
                               glm::vec3(WC::ROAD_W, WC::ROAD_THK, WC::ROAD_L)),
         WC::COL_ROAD
         });
 
-    // 2-1) Center dashed line
+    // 2-1) Center dashed line (중앙선도 도로를 따라 이동)
     for (int i = -5; i <= 5; i++) {
         float z = WC::ROAD_Z + i * 10.0f;
         items.push_back({
-            MakeModel_BottomPivot(glm::vec3(0.0f, overlayY + 0.001f, z), glm::vec3(0.0f),
-                                  glm::vec3(0.5f, 0.01f, 4.0f)),
+            MakeModel_BottomPivot(glm::vec3(roadXOffset, overlayY + 0.001f, z), glm::vec3(0.0f),
+                                  glm::vec3(0.5f, 0.1f, 4.0f)),
             WC::COL_LINE
             });
     }
 
-    // 3) Sidewalks
-    float xLeft = -(WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
-    float xRight = +(WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
+    // 3) Sidewalks (인도 역시 도로의 양옆으로 재계산)
+    float sidewalkXLeft = roadXOffset - (WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
+    float sidewalkXRight = roadXOffset + (WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
 
     items.push_back({
-        MakeModel_BottomPivot(glm::vec3(xLeft, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
+        MakeModel_BottomPivot(glm::vec3(sidewalkXLeft, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
                               glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L)),
         WC::COL_SIDEWALK
         });
 
     items.push_back({
-        MakeModel_BottomPivot(glm::vec3(xRight, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
+        MakeModel_BottomPivot(glm::vec3(sidewalkXRight, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
                               glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L)),
         WC::COL_SIDEWALK
         });
+
 
     // 4) Shinchan house pivot + yard
     glm::vec3 shinHouseCenter = WC::SHIN_CENTER;
@@ -272,12 +278,94 @@ int main() {
         WC::COL_YARD
         });
 
-    // 4-1) Driveway
+
+    // --- 소나무 (계단식 사각뿔 형태) ---
+    glm::vec3 pinePos = WC::SHIN_CENTER + glm::vec3(8.0f, overlayY, 6.0f);
+
+    // 1) 나무 기둥 (Brown)
     items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, overlayY, WC::DRIVE_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::DRIVE_W, WC::DRIVE_THK, WC::DRIVE_L)),
-        glm::vec3(0.30f, 0.30f, 0.30f)
+        MakeModel_BottomPivot(pinePos, glm::vec3(0.0f), glm::vec3(0.7f, 3.5f, 0.7f)),
+        glm::vec3(0.35f, 0.20f, 0.10f)
         });
+
+    // 2) 나뭇잎 - 하단 (가장 넓음)
+    items.push_back({
+        MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 2.5f, 0.0f), glm::vec3(0.0f), glm::vec3(4.0f, 1.2f, 4.0f)),
+        WC::COL_GRASS
+        });
+
+    // 3) 나뭇잎 - 중단 (중간 크기)
+    items.push_back({
+        MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 3.7f, 0.0f), glm::vec3(0.0f), glm::vec3(2.8f, 1.0f, 2.8f)),
+        WC::COL_GRASS
+        });
+
+    // 4) 나뭇잎 - 상단 (가장 작음, 뾰족한 끝 부분)
+    items.push_back({
+        MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 4.7f, 0.0f), glm::vec3(0.0f), glm::vec3(1.5f, 1.0f, 1.5f)),
+        WC::COL_GRASS
+        });
+
+    // 건조대
+    glm::vec3 rackPos = WC::SHIN_CENTER + glm::vec3(-6.0f, WC::OVERLAY_Y, 5.0f);
+
+    glm::vec3 colFrame = glm::vec3(0.82f, 0.82f, 0.85f);
+    glm::vec3 colWire = glm::vec3(0.75f, 0.75f, 0.78f);
+
+    float rW = 1.4f;    // 가로 폭 (X축)
+    float rD = 0.8f;    // 깊이 (Z축 - 봉이 뻗는 방향)
+    float rH = 1.0f;    // 높이
+    float pThk = 0.03f; // 프레임 두께
+
+    // 수직 다리
+    float legX[2] = { -rW / 2.0f, rW / 2.0f };
+    float legZ[2] = { rD / 2.0f, -rD / 2.0f };
+
+    for (int ix = 0; ix < 2; ix++) {
+        for (int iz = 0; iz < 2; iz++) {
+            items.push_back({
+                MakeModel_BottomPivot(rackPos + glm::vec3(legX[ix], 0, legZ[iz]), glm::vec3(0), glm::vec3(pThk, rH, pThk)),
+                colFrame
+                });
+        }
+    }
+
+    // 상단 테두리 프레임
+    // 좌우 긴 프레임 (Z축 방향)
+    for (int ix = 0; ix < 2; ix++) {
+        items.push_back({
+            MakeModel_CenterPivot(rackPos + glm::vec3(legX[ix], rH, 0), glm::vec3(0), glm::vec3(pThk, pThk, rD)),
+            colFrame
+            });
+    }
+    // 앞뒤 가로 프레임 (X축 방향)
+    for (int iz = 0; iz < 2; iz++) {
+        items.push_back({
+            MakeModel_CenterPivot(rackPos + glm::vec3(0, rH, legZ[iz]), glm::vec3(0), glm::vec3(rW, pThk, pThk)),
+            colFrame
+            });
+    }
+
+    // 빨래 너는 봉
+    int wireCount = 7;
+    float wireGap = rW / (wireCount + 1);
+
+    for (int i = 1; i <= wireCount; i++) {
+        float xPos = (rW / 2.0f) - (wireGap * i);
+        items.push_back({
+            MakeModel_CenterPivot(rackPos + glm::vec3(xPos, rH, 0), glm::vec3(0), glm::vec3(0.012f, 0.012f, rD)),
+            colWire
+            });
+    }
+
+    // 수건
+    float towelX = (rW / 2.0f) - (wireGap * 3);
+    items.push_back({
+        MakeModel_CenterPivot(rackPos + glm::vec3(towelX, rH - 0.35f, 0.0f), glm::vec3(0), glm::vec3(0.03f, 0.7f, 0.4f)),
+        glm::vec3(0.92f, 0.92f, 0.95f)
+        });
+
+
 
     float lastFrame = 0.0f;
 
