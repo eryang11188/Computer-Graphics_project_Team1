@@ -27,6 +27,22 @@ float zoomSpeed = WC::ZOOM_SPEED;
 float radiusMin = WC::R_MIN;
 float radiusMax = WC::R_MAX;
 
+// ----- Fence 담장 기준 계산 -----
+
+//담장이 차지하는 반쪽 좌우,앞뒤 방향 거리
+float fenceHalfW = WC::YARD_W * 0.5f + WC::FENCE_MARGIN;
+float fenceHalfL = WC::YARD_L * 0.5f + WC::FENCE_MARGIN;
+
+//앞/뒤 담장 전체 길이
+float fenceLenX = WC::YARD_W + WC::FENCE_MARGIN * 2.0f + WC::FENCE_THK;
+//좌/우 담장 전체 길이
+float fenceLenZ = WC::YARD_L + WC::FENCE_MARGIN * 2.0f + WC::FENCE_THK;
+//담장 두께
+float fenceThk = WC::FENCE_THK;
+
+//담장 색
+glm::vec3 fenceColor(0.75f, 0.70f, 0.60f);
+
 static void glfw_error_callback(int code, const char* desc) {
     std::cerr << "[GLFW ERROR] " << code << " : " << (desc ? desc : "") << "\n";
 }
@@ -271,6 +287,51 @@ int main() {
                               glm::vec3(WC::YARD_W, WC::YARD_THK, WC::YARD_L)),
         WC::COL_YARD
         });
+
+
+    // ===============================
+    //          Fence(담장)
+    // ===============================
+    // Front
+    items.push_back({
+        MakeModel_BottomPivot(
+            glm::vec3(0.0f, WC::GROUND_Y, shinHouseCenter.z + fenceHalfL),
+            glm::vec3(0.0f),
+            glm::vec3(fenceLenX, WC::FENCE_H, WC::FENCE_THK)
+        ),
+        fenceColor
+        });
+
+    // Back
+    items.push_back({
+        MakeModel_BottomPivot(
+            glm::vec3(0.0f, WC::GROUND_Y, shinHouseCenter.z - fenceHalfL),
+            glm::vec3(0.0f),
+            glm::vec3(fenceLenX, WC::FENCE_H, WC::FENCE_THK)
+        ),
+        fenceColor
+        });
+
+    // Left
+    items.push_back({
+        MakeModel_BottomPivot(
+            glm::vec3(-fenceHalfW, WC::GROUND_Y, shinHouseCenter.z),
+            glm::vec3(0.0f),
+            glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ)
+        ),
+        fenceColor
+        });
+
+    // Right
+    items.push_back({
+        MakeModel_BottomPivot(
+            glm::vec3(+fenceHalfW, WC::GROUND_Y, shinHouseCenter.z),
+            glm::vec3(0.0f),
+            glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ)
+        ),
+        fenceColor
+        });
+
 
     // 4-1) Driveway
     items.push_back({

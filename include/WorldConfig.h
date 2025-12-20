@@ -4,6 +4,11 @@
 
 namespace WC {
 
+    //담장
+    constexpr float FENCE_H = 1.8f;
+    constexpr float FENCE_THK = 0.4f;
+    constexpr float FENCE_MARGIN = 2.0f;
+
     // 창
     constexpr int WIN_W = 1600;
     constexpr int WIN_H = 900;
