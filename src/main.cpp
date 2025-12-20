@@ -532,6 +532,41 @@ int main() {
     int cloudCount = 15;
     float halfGround = WC::GROUND_SIZE * 0.5f - 10.0f;
 
+    glm::vec3 grassColor(0.18f, 0.45f, 0.18f);
+
+    int grassPatchCount = 70;
+
+    float halfGround = WC::GROUND_SIZE * 0.5f;
+
+    for (int i = 0; i < grassPatchCount; ++i)
+    {
+        float patchMargin = 2.0f;
+
+        float x = (rand() % (int)((halfGround - patchMargin) * 2)
+            - (halfGround - patchMargin));
+        float z = (rand() % (int)((halfGround - patchMargin) * 2)
+            - (halfGround - patchMargin));
+
+        if (abs(x - H_center.x) < WC::YARD_W * 0.6f &&
+            abs(z - H_center.z) < WC::YARD_L * 0.6f)
+            continue;
+
+        float w = 1.8f + (rand() % 20) / 10.0f;
+        float l = 1.8f + (rand() % 20) / 10.0f;
+
+        float g = 0.40f + (rand() % 20) / 100.0f;
+        glm::vec3 grassColor(0.18f, g, 0.18f);
+
+        items.push_back({
+            MakeModel_BottomPivot(
+                glm::vec3(x, overlayY + 0.001f, z),
+                glm::vec3(0.0f),
+                glm::vec3(w, 0.02f, l)
+            ),
+            grassColor
+            });
+    }
+
     for (int i = 0; i < cloudCount; ++i)
     {
         float x = H_center.x + (rand() % (int)(halfGround * 2) - halfGround);
