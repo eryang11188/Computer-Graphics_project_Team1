@@ -146,24 +146,45 @@ int main() {
     glEnable(GL_DEPTH_TEST);
 
     float vertices[] = {
-        -0.5f, -0.5f, -0.5f,
-         0.5f, -0.5f, -0.5f,
-         0.5f,  0.5f, -0.5f,
-        -0.5f,  0.5f, -0.5f,
-        -0.5f, -0.5f,  0.5f,
-         0.5f, -0.5f,  0.5f,
-         0.5f,  0.5f,  0.5f,
-        -0.5f,  0.5f,  0.5f
+      -0.5f,-0.5f, 0.5f,  0.0f, 0.0f, 1.0f,
+       0.5f,-0.5f, 0.5f,  0.0f, 0.0f, 1.0f,
+       0.5f, 0.5f, 0.5f,  0.0f, 0.0f, 1.0f,
+      -0.5f, 0.5f, 0.5f,  0.0f, 0.0f, 1.0f,
+
+       0.5f,-0.5f,-0.5f,  0.0f, 0.0f,-1.0f,
+      -0.5f,-0.5f,-0.5f,  0.0f, 0.0f,-1.0f,
+      -0.5f, 0.5f,-0.5f,  0.0f, 0.0f,-1.0f,
+       0.5f, 0.5f,-0.5f,  0.0f, 0.0f,-1.0f,
+
+      -0.5f,-0.5f,-0.5f, -1.0f, 0.0f, 0.0f,
+      -0.5f,-0.5f, 0.5f, -1.0f, 0.0f, 0.0f,
+      -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f,
+      -0.5f, 0.5f,-0.5f, -1.0f, 0.0f, 0.0f,
+
+       0.5f,-0.5f, 0.5f,  1.0f, 0.0f, 0.0f,
+       0.5f,-0.5f,-0.5f,  1.0f, 0.0f, 0.0f,
+       0.5f, 0.5f,-0.5f,  1.0f, 0.0f, 0.0f,
+       0.5f, 0.5f, 0.5f,  1.0f, 0.0f, 0.0f,
+
+      -0.5f, 0.5f, 0.5f,  0.0f, 1.0f, 0.0f,
+       0.5f, 0.5f, 0.5f,  0.0f, 1.0f, 0.0f,
+       0.5f, 0.5f,-0.5f,  0.0f, 1.0f, 0.0f,
+      -0.5f, 0.5f,-0.5f,  0.0f, 1.0f, 0.0f,
+
+      -0.5f,-0.5f,-0.5f,  0.0f,-1.0f, 0.0f,
+       0.5f,-0.5f,-0.5f,  0.0f,-1.0f, 0.0f,
+       0.5f,-0.5f, 0.5f,  0.0f,-1.0f, 0.0f,
+      -0.5f,-0.5f, 0.5f,  0.0f,-1.0f, 0.0f
     };
 
     unsigned int indices[] = {
         0,1,2, 2,3,0,
         4,5,6, 6,7,4,
-        0,4,7, 7,3,0,
-        1,5,6, 6,2,1,
-        0,1,5, 5,4,0,
-        3,2,6, 6,7,3
-    };
+        8,9,10, 10,11,8,
+        12,13,14, 14,15,12,
+        16,17,18, 18,19,16,
+        20,21,22, 22,23,20
+    };;
 
     unsigned int VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
@@ -178,26 +199,69 @@ int main() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
 
     glBindVertexArray(0);
 
     const char* vertexShaderSrc = R"(
-        #version 330 core
-        layout (location = 0) in vec3 aPos;
-        uniform mat4 model;
-        uniform mat4 view;
-        uniform mat4 projection;
-        void main() { gl_Position = projection * view * model * vec4(aPos, 1.0); }
-    )";
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+out vec3 FragPos;
+out vec3 Normal;
+
+void main() {
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    gl_Position = projection * view * worldPos;
+}
+)";
 
     const char* fragmentShaderSrc = R"(
-        #version 330 core
-        out vec4 FragColor;
-        uniform vec3 uColor;
-        void main() { FragColor = vec4(uColor, 1.0); }
-    )";
+#version 330 core
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+
+uniform vec3 uColor;
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+uniform vec3 viewPos;
+uniform float ambientStrength;
+uniform float specularStrength;
+uniform float shininess;
+
+void main() {
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = normalize(lightPos - FragPos);
+
+    float diff = max(dot(norm, lightDir), 0.0);
+
+    vec3 viewDir = normalize(viewPos - FragPos);
+    vec3 halfDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(norm, halfDir), 0.0), shininess);
+
+    vec3 ambient = ambientStrength * lightColor;
+    vec3 diffuse = diff * lightColor;
+    vec3 specular = specularStrength * spec * lightColor;
+
+    vec3 color = (ambient + diffuse) * uColor + specular;
+    FragColor = vec4(color, 1.0);
+}
+)";
+
 
     GLuint vs = compileShader(GL_VERTEX_SHADER, vertexShaderSrc);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSrc);
@@ -210,6 +274,14 @@ int main() {
     GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
     GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
     GLint colorLoc = glGetUniformLocation(shaderProgram, "uColor");
+    GLint lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
+    GLint lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
+    GLint viewPosLoc = glGetUniformLocation(shaderProgram, "viewPos");
+    GLint ambientLoc = glGetUniformLocation(shaderProgram, "ambientStrength");
+    GLint specularLoc = glGetUniformLocation(shaderProgram, "specularStrength");
+    GLint shininessLoc = glGetUniformLocation(shaderProgram, "shininess");
+
+
 
     const float groundY = WC::GROUND_Y;
     const float overlayY = WC::OVERLAY_Y;
@@ -364,34 +436,34 @@ int main() {
         glm::vec3 slotCol(0.10f, 0.10f, 0.10f);
         glm::vec3 flagCol(0.95f, 0.25f, 0.20f);
 
-        
-        const float MB_SCALE = 2.2f; 
 
-        float mbX = gateRightX + 1.35f + 1.10f * (MB_SCALE - 1.0f); 
-        float mbZ = frontFenceOuterZ + 1.00f + 0.80f * (MB_SCALE - 1.0f); 
+        const float MB_SCALE = 2.2f;
+
+        float mbX = gateRightX + 1.35f + 1.10f * (MB_SCALE - 1.0f);
+        float mbZ = frontFenceOuterZ + 1.00f + 0.80f * (MB_SCALE - 1.0f);
         float mbY = overlayY;
 
-        
+
         AddBottom(glm::vec3(mbX, mbY, mbZ), glm::vec3(0.0f),
             glm::vec3(0.90f * MB_SCALE, 0.12f * MB_SCALE, 0.90f * MB_SCALE), postCol * 0.85f);
 
-        
+
         AddBottom(glm::vec3(mbX, mbY + 0.12f * MB_SCALE, mbZ), glm::vec3(0.0f),
             glm::vec3(0.18f * MB_SCALE, 1.25f * MB_SCALE, 0.18f * MB_SCALE), postCol);
 
-        
+
 
 
         float boxY = mbY + 0.12f * MB_SCALE + 1.25f * MB_SCALE;
         AddBottom(glm::vec3(mbX, boxY, mbZ), glm::vec3(0.0f),
             glm::vec3(0.92f * MB_SCALE, 0.52f * MB_SCALE, 0.52f * MB_SCALE), boxCol);
 
-       
-            
+
+
         AddCenter(glm::vec3(mbX, boxY + 0.32f * MB_SCALE, mbZ + 0.29f * MB_SCALE), glm::vec3(0.0f),
             glm::vec3(0.60f * MB_SCALE, 0.10f * MB_SCALE, 0.05f * MB_SCALE), slotCol);
 
-        
+
         AddCenter(glm::vec3(mbX + 0.52f * MB_SCALE, boxY + 0.34f * MB_SCALE, mbZ), glm::vec3(0.0f),
             glm::vec3(0.12f * MB_SCALE, 0.40f * MB_SCALE, 0.08f * MB_SCALE), flagCol);
     }
@@ -1035,41 +1107,41 @@ int main() {
             glm::vec3(0.0f), glm::vec3(dogW * 0.55f, dogH * 0.62f, 0.10f), holeCol, true);
 
 
-     
+
         {
-           
+
             float rackX = Hc.x - W1 * 0.22f;
 
-          
-          
-            float rackFrontOffset = 3.2f * HOUSE_SCALE;  
+
+
+            float rackFrontOffset = 3.2f * HOUSE_SCALE;
             float rackZ = winFrontZ + rackFrontOffset;
 
-            
+
             float rackY = overlayY + WC::YARD_THK + 0.003f;
 
             glm::vec3 rackPos(rackX, rackY, rackZ);
 
-          
+
             glm::vec3 colFrame(0.45f, 0.45f, 0.50f);
             glm::vec3 colWire(0.30f, 0.30f, 0.34f);
 
-            
-            const float RACK_SCALE = 2.4f;   
 
-            float rW = 1.4f * RACK_SCALE; 
-            float rD = 0.8f * RACK_SCALE; 
-            float rH = 1.0f * RACK_SCALE; 
-            float pThk = 0.03f * RACK_SCALE; 
+            const float RACK_SCALE = 2.4f;
 
-           
+            float rW = 1.4f * RACK_SCALE;
+            float rD = 0.8f * RACK_SCALE;
+            float rH = 1.0f * RACK_SCALE;
+            float pThk = 0.03f * RACK_SCALE;
+
+
             float wireThk = 0.012f * RACK_SCALE;
             float towelThk = 0.03f * RACK_SCALE;
 
             float legX[2] = { -rW * 0.5f, +rW * 0.5f };
             float legZ[2] = { +rD * 0.5f, -rD * 0.5f };
 
-          
+
             for (int ix = 0; ix < 2; ++ix) {
                 for (int iz = 0; iz < 2; ++iz) {
                     AddBottom(rackPos + glm::vec3(legX[ix], 0.0f, legZ[iz]),
@@ -1079,10 +1151,10 @@ int main() {
                 }
             }
 
-           
+
             float topY = rH - pThk * 0.5f;
 
-          
+
             for (int ix = 0; ix < 2; ++ix) {
                 AddCenter(rackPos + glm::vec3(legX[ix], topY, 0.0f),
                     glm::vec3(0.0f),
@@ -1090,7 +1162,7 @@ int main() {
                     colFrame);
             }
 
-           
+
             for (int iz = 0; iz < 2; ++iz) {
                 AddCenter(rackPos + glm::vec3(0.0f, topY, legZ[iz]),
                     glm::vec3(0.0f),
@@ -1098,8 +1170,8 @@ int main() {
                     colFrame);
             }
 
-        
-            int wireCount = 9;                
+
+            int wireCount = 9;
             float wireGap = rW / (wireCount + 1);
 
             for (int i = 1; i <= wireCount; ++i) {
@@ -1110,7 +1182,7 @@ int main() {
                     colWire);
             }
 
-         
+
             float towelX = (rW * 0.5f) - (wireGap * 4);
             float towelDrop = 0.35f * RACK_SCALE;
 
@@ -1119,8 +1191,8 @@ int main() {
                 glm::vec3(towelThk, 0.7f * RACK_SCALE, 0.4f * RACK_SCALE),
                 glm::vec3(0.92f, 0.92f, 0.95f));
         }
-       
-        
+
+
 
         glm::vec3 carCenter = Hc + glm::vec3(W1 * 0.60f + 4.8f * HOUSE_SCALE, 0.0f, D1 * 0.18f);
         float carBaseY = slabY + slabH;
@@ -1537,32 +1609,32 @@ int main() {
         }
 
         {
-         
+
             float poleH = 9.6f;
             float poleW = 0.34f;
 
-        
+
             float outPad = 6.0f;
 
-          
+
             float outLeftX = center.x - fenceHalfW - outPad;
             float outRightX = center.x + fenceHalfW + outPad;
 
-         
+
             float outBackZ = center.z - fenceHalfL - outPad;
 
-        
+
             AddStreetLight(glm::vec3(outLeftX, overlayY, Hc.z + D1 * 0.10f), poleH, poleW);
             AddStreetLight(glm::vec3(outLeftX, overlayY, Hc.z - D1 * 0.18f), poleH, poleW);
 
-       
+
             AddStreetLight(glm::vec3(outRightX, overlayY, Hc.z + D1 * 0.08f), poleH, poleW);
             AddStreetLight(glm::vec3(outRightX, overlayY, Hc.z - D1 * 0.20f), poleH, poleW);
 
-            
+
             AddStreetLight(glm::vec3(Hc.x - W1 * 0.18f, overlayY, outBackZ), poleH, poleW);
             AddStreetLight(glm::vec3(Hc.x + W1 * 0.18f, overlayY, outBackZ), poleH, poleW);
-}
+        }
 
     }
 
@@ -1706,6 +1778,17 @@ int main() {
         glUseProgram(shaderProgram);
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+
+        glm::vec3 lightPos = center + glm::vec3(45.0f, 55.0f, 35.0f);
+        glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+
+        glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPos));
+        glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
+        glUniform3fv(viewPosLoc, 1, glm::value_ptr(cameraPos));
+        glUniform1f(ambientLoc, 0.22f);
+        glUniform1f(specularLoc, 0.45f);
+        glUniform1f(shininessLoc, 64.0f);
+
 
         glBindVertexArray(VAO);
         for (const auto& it : items) {
