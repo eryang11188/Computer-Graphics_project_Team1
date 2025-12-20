@@ -8,6 +8,9 @@
 #include <vector>
 #include <iostream>
 #include <cmath>
+#include <ctime>
+#include <cstdlib>
+#include <algorithm>
 
 #include "WorldConfig.h"
 #include "TransformUtils.h"
@@ -25,19 +28,18 @@ static void glfw_error_callback(int code, const char* desc) {
     std::cerr << "[GLFW ERROR] " << code << " : " << (desc ? desc : "") << "\n";
 }
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+void framebuffer_size_callback(GLFWwindow*, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-void scroll_callback(GLFWwindow* window, double, double yoffset) {
+void scroll_callback(GLFWwindow*, double, double yoffset) {
     radius -= (float)yoffset * zoomSpeed;
     if (radius < radiusMin) radius = radiusMin;
     if (radius > radiusMax) radius = radiusMax;
 }
 
 void processInput(GLFWwindow* window, float deltaTime) {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
 
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) yaw -= angularSpeed * deltaTime;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) yaw += angularSpeed * deltaTime;
@@ -87,6 +89,7 @@ struct RenderItem {
 };
 
 int main() {
+    srand((unsigned int)time(nullptr));
     glfwSetErrorCallback(glfw_error_callback);
 
     if (!glfwInit()) {
@@ -204,14 +207,15 @@ int main() {
 
     glUseProgram(shaderProgram);
     GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
-    GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
-    GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+    GLint viewLoc  = glGetUniformLocation(shaderProgram, "view");
+    GLint projLoc  = glGetUniformLocation(shaderProgram, "projection");
     GLint colorLoc = glGetUniformLocation(shaderProgram, "uColor");
 
     const float groundY = WC::GROUND_Y;
     const float overlayY = WC::OVERLAY_Y;
     glm::vec3 center = WC::SHIN_CENTER;
 
+    // main 기준 유지
     constexpr float YARD_SCALE_W = 2.40f;
     constexpr float YARD_SCALE_L = 1.95f;
 
@@ -236,17 +240,17 @@ int main() {
     float yardFullW = fenceHalfW * 2.0f;
     float yardFullL = fenceHalfL * 2.0f;
 
-    float fenceLeftX = center.x - fenceLenX * 0.5f;
+    float fenceLeftX  = center.x - fenceLenX * 0.5f;
     float fenceRightX = center.x + fenceLenX * 0.5f;
 
     float gateCenterX = center.x + gateOffsetX;
-    float gateLeftX = gateCenterX - gateW * 0.5f;
-    float gateRightX = gateCenterX + gateW * 0.5f;
+    float gateLeftX   = gateCenterX - gateW * 0.5f;
+    float gateRightX  = gateCenterX + gateW * 0.5f;
 
-    float leftLen = gateLeftX - fenceLeftX;
+    float leftLen  = gateLeftX - fenceLeftX;
     float rightLen = fenceRightX - gateRightX;
 
-    float leftCenterX = fenceLeftX + leftLen * 0.5f;
+    float leftCenterX  = fenceLeftX + leftLen * 0.5f;
     float rightCenterX = gateRightX + rightLen * 0.5f;
 
     std::vector<RenderItem> items;
@@ -258,6 +262,7 @@ int main() {
         items.push_back({ MakeModel_CenterPivot(pos, euler, scl), col });
     };
 
+    // 바닥/마당/담장/기둥/진입로 (main 유지)
     AddBottom(glm::vec3(0.0f, groundY, 0.0f), glm::vec3(0.0f),
               glm::vec3(WC::GROUND_SIZE, WC::GROUND_THK, WC::GROUND_SIZE),
               WC::COL_GRASS);
@@ -298,13 +303,14 @@ int main() {
     float driveL = 15.0f;
 
     float frontFenceCenterZ = center.z + fenceHalfL;
-    float frontFenceOuterZ = frontFenceCenterZ + fenceThk * 0.5f;
-    float driveCenterZ = frontFenceOuterZ + driveL * 0.5f;
+    float frontFenceOuterZ  = frontFenceCenterZ + fenceThk * 0.5f;
+    float driveCenterZ      = frontFenceOuterZ + driveL * 0.5f;
 
     AddBottom(glm::vec3(gateCenterX, overlayY, driveCenterZ), glm::vec3(0.0f),
               glm::vec3(driveW, WC::DRIVE_THK, driveL),
               glm::vec3(0.45f, 0.45f, 0.45f));
 
+    // 소나무 (main 유지)
     auto AddPine = [&](glm::vec3 base, float trunkH, float trunkW, glm::vec3 leafColor) {
         base.y = overlayY;
 
@@ -346,6 +352,7 @@ int main() {
     AddPine(glm::vec3(outXL, overlayY, outZ1 + 2.4f), 6.0f, 0.90f, leafB);
     AddPine(glm::vec3(outXL - 5.8f, overlayY, outZ2 + 1.8f), 6.8f, 0.98f, leafA);
 
+    // main 집/차고 블록(그대로 유지)
     glm::vec3 colBase(0.55f, 0.45f, 0.35f);
     glm::vec3 colWall(0.86f, 0.82f, 0.72f);
     glm::vec3 colTrim(0.93f, 0.93f, 0.93f);
@@ -408,7 +415,6 @@ int main() {
                glm::vec3(W2, H2, D2), colWall, true);
 
         float frontZ1 = Hc.z + D1 * 0.5f;
-        float backZ1  = Hc.z - D1 * 0.5f;
 
         glm::vec3 porch = Hc + glm::vec3(W1 * 0.20f, 0.0f, D1 * 0.5f - 2.4f);
         AddBox(glm::vec3(porch.x, f1Y, porch.z), glm::vec3(0.0f),
@@ -533,6 +539,81 @@ int main() {
         AddHipRoof(carRoofCenter, 8.2f, 7.6f, carPitch, 0.26f, colRoof);
     }
 
+    // ====== 여기부터: "잔디 + 구름"만 추가(집 코드는 건드리지 않음) ======
+    {
+        // 1) 구름
+        glm::vec3 cloudColor(0.95f, 0.95f, 0.97f);
+        float cloudY = overlayY + 30.0f;
+
+        auto AddCloud = [&](glm::vec3 c, float s) {
+            AddCenter(c, glm::vec3(0.0f),
+                      glm::vec3(10.0f * s, 2.5f * s, 6.0f * s),
+                      cloudColor);
+
+            AddCenter(c + glm::vec3(-4.0f * s, 0.8f * s, 0.0f), glm::vec3(0.0f),
+                      glm::vec3(7.0f * s, 2.0f * s, 5.0f * s),
+                      cloudColor);
+
+            AddCenter(c + glm::vec3(4.5f * s, 0.4f * s, -1.0f * s), glm::vec3(0.0f),
+                      glm::vec3(6.5f * s, 1.8f * s, 4.8f * s),
+                      cloudColor);
+
+            AddCenter(c + glm::vec3(0.0f, -0.4f * s, 2.0f * s), glm::vec3(0.0f),
+                      glm::vec3(8.0f * s, 1.6f * s, 5.8f * s),
+                      cloudColor);
+        };
+
+        int cloudCount = 15;
+        float halfGroundCloud = WC::GROUND_SIZE * 0.5f - 10.0f;
+
+        for (int i = 0; i < cloudCount; ++i) {
+            float rx = (float)(rand() % (int)(halfGroundCloud * 2.0f) - (int)halfGroundCloud);
+            float rz = (float)(rand() % (int)(halfGroundCloud * 2.0f) - (int)halfGroundCloud);
+
+            float x = center.x + rx;
+            float z = center.z + rz;
+
+            float y = cloudY + (float)(rand() % 7 - 3);
+            float s = 0.8f + (float)(rand() % 60) / 100.0f;
+
+            AddCloud(glm::vec3(x, y, z), s);
+        }
+
+        // 2) 잔디 패치(월드 바닥에 랜덤)
+        int grassPatchCount = 70;
+        float halfGround = WC::GROUND_SIZE * 0.5f;
+
+        for (int i = 0; i < grassPatchCount; ++i) {
+            float patchMargin = 2.0f;
+
+            float rx = (float)(rand() % (int)((halfGround - patchMargin) * 2.0f) - (int)(halfGround - patchMargin));
+            float rz = (float)(rand() % (int)((halfGround - patchMargin) * 2.0f) - (int)(halfGround - patchMargin));
+
+            float gx = rx;
+            float gz = rz;
+
+            // 마당(펜스 안쪽) 근처는 비워두기: center + yardW/yardL 기준(집 변수 의존 X)
+            if (std::abs(gx - center.x) < yardW * 0.55f &&
+                std::abs(gz - center.z) < yardL * 0.55f) {
+                continue;
+            }
+
+            float w = 1.8f + (float)(rand() % 20) / 10.0f;
+            float l = 1.8f + (float)(rand() % 20) / 10.0f;
+
+            float g = 0.40f + (float)(rand() % 20) / 100.0f;
+            glm::vec3 grassColor(0.18f, g, 0.18f);
+
+            items.push_back({
+                MakeModel_BottomPivot(glm::vec3(gx, overlayY + 0.001f, gz),
+                                      glm::vec3(0.0f),
+                                      glm::vec3(w, 0.02f, l)),
+                grassColor
+            });
+        }
+    }
+    // ====== 잔디 + 구름 추가 끝 ======
+
     float lastFrame = 0.0f;
 
     while (!glfwWindowShouldClose(window)) {
@@ -568,7 +649,7 @@ int main() {
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
         glBindVertexArray(VAO);
-        for (const auto& it : items) {
+              for (const auto& it : items) {
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(it.model));
             glUniform3fv(colorLoc, 1, glm::value_ptr(it.color));
             glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
@@ -583,6 +664,8 @@ int main() {
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     glDeleteProgram(shaderProgram);
+
     glfwTerminate();
     return 0;
 }
+
