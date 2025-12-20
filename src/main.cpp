@@ -1,11 +1,5 @@
-<<<<<<< HEAD
-// main.cpp
-// C++ + OpenGL(3.3) + GLFW + GLAD + GLM
-// Ground/Road/Sidewalk + Orbit Camera + Mouse Wheel Zoom + Borderless Window
-=======
 // main.cpp 
 
->>>>>>> ce3d923 (담장과 담장 입구 구현 (#7))
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -245,72 +239,11 @@ int main() {
     GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
     GLint colorLoc = glGetUniformLocation(shaderProgram, "uColor");
 
-    // World items
+        // World items
     std::vector<RenderItem> items;
 
-<<<<<<< HEAD
+    // ground / overlay
     const float groundY = WC::GROUND_Y;
-    const float overlayY = WC::OVERLAY_Y;
-
-    // 1) Grass ground
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, groundY, 0.0f), glm::vec3(0.0f),
-                              glm::vec3(WC::GROUND_SIZE, WC::GROUND_THK, WC::GROUND_SIZE)),
-        WC::COL_GRASS
-        });
-
-    // 2) Road
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::ROAD_W, WC::ROAD_THK, WC::ROAD_L)),
-        WC::COL_ROAD
-        });
-
-    // 2-1) Center dashed line
-    for (int i = -5; i <= 5; i++) {
-        float z = WC::ROAD_Z + i * 10.0f;
-        items.push_back({
-            MakeModel_BottomPivot(glm::vec3(0.0f, overlayY + 0.001f, z), glm::vec3(0.0f),
-                                  glm::vec3(0.5f, 0.01f, 4.0f)),
-            WC::COL_LINE
-            });
-    }
-
-    // 3) Sidewalks
-    float xLeft = -(WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
-    float xRight = +(WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
-
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(xLeft, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L)),
-        WC::COL_SIDEWALK
-        });
-
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(xRight, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L)),
-        WC::COL_SIDEWALK
-        });
-
-    // 4) Shinchan house pivot + yard
-    glm::vec3 shinHouseCenter = WC::SHIN_CENTER;
-
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(shinHouseCenter.x, overlayY, shinHouseCenter.z), glm::vec3(0.0f),
-                              glm::vec3(WC::YARD_W, WC::YARD_THK, WC::YARD_L)),
-        WC::COL_YARD
-        });
-
-    // 4-1) Driveway
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, overlayY, WC::DRIVE_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::DRIVE_W, WC::DRIVE_THK, WC::DRIVE_L)),
-        glm::vec3(0.30f, 0.30f, 0.30f)
-        });
-
-=======
-   // ground / overlay
-    const float groundY  = WC::GROUND_Y;
     const float overlayY = WC::OVERLAY_Y;
 
 
@@ -347,9 +280,9 @@ int main() {
         ),
         glm::vec3(0.0f),
         glm::vec3(
-            yardFullW,         
+            yardFullW,
             WC::YARD_THK,
-            yardFullL          
+            yardFullL
         )
     ),
     WC::COL_YARD
@@ -424,7 +357,7 @@ int main() {
       fenceColor
         });
 
-  
+
 
     items.push_back({
     MakeModel_BottomPivot(
@@ -473,34 +406,33 @@ int main() {
         });
 
     // --- 소나무 (계단식 사각뿔 형태) ---
-        glm::vec3 pinePos = shinHouseCenter + glm::vec3(8.0f, 0.0f, 6.0f);
-        pinePos.y = overlayY; 
-        
-        // 1) 나무 기둥 (Brown)
-        items.push_back({
-            MakeModel_BottomPivot(pinePos, glm::vec3(0.0f), glm::vec3(0.7f, 3.5f, 0.7f)),
-            glm::vec3(0.35f, 0.20f, 0.10f)
-            });
-        
-        // 2) 나뭇잎 - 하단
-        items.push_back({
-            MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 2.5f, 0.0f), glm::vec3(0.0f), glm::vec3(4.0f, 1.2f, 4.0f)),
-            WC::COL_GRASS
-            });
-        
-        // 3) 나뭇잎 - 중단
-        items.push_back({
-            MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 3.7f, 0.0f), glm::vec3(0.0f), glm::vec3(2.8f, 1.0f, 2.8f)),
-            WC::COL_GRASS
-            });
-        
-        // 4) 나뭇잎 - 상단
-        items.push_back({
-            MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 4.7f, 0.0f), glm::vec3(0.0f), glm::vec3(1.5f, 1.0f, 1.5f)),
-            WC::COL_GRASS
-            });
+    glm::vec3 pinePos = shinHouseCenter + glm::vec3(8.0f, 0.0f, 6.0f);
+    pinePos.y = overlayY;
 
->>>>>>> ce3d923 (담장과 담장 입구 구현 (#7))
+    // 1) 나무 기둥 (Brown)
+    items.push_back({
+        MakeModel_BottomPivot(pinePos, glm::vec3(0.0f), glm::vec3(0.7f, 3.5f, 0.7f)),
+        glm::vec3(0.35f, 0.20f, 0.10f)
+        });
+
+    // 2) 나뭇잎 - 하단
+    items.push_back({
+        MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 2.5f, 0.0f), glm::vec3(0.0f), glm::vec3(4.0f, 1.2f, 4.0f)),
+        WC::COL_GRASS
+        });
+
+    // 3) 나뭇잎 - 중단
+    items.push_back({
+        MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 3.7f, 0.0f), glm::vec3(0.0f), glm::vec3(2.8f, 1.0f, 2.8f)),
+        WC::COL_GRASS
+        });
+
+    // 4) 나뭇잎 - 상단
+    items.push_back({
+        MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 4.7f, 0.0f), glm::vec3(0.0f), glm::vec3(1.5f, 1.0f, 1.5f)),
+        WC::COL_GRASS
+        });
+
     float lastFrame = 0.0f;
 
     while (!glfwWindowShouldClose(window)) {
