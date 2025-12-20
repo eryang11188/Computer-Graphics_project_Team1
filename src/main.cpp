@@ -1,4 +1,4 @@
-// main.cpp
+// main.cpp local
 // C++ + OpenGL(3.3) + GLFW + GLAD + GLM
 // Ground/Road/Sidewalk + Orbit Camera + Mouse Wheel Zoom + Borderless Window
 
@@ -27,21 +27,28 @@ float zoomSpeed = WC::ZOOM_SPEED;
 float radiusMin = WC::R_MIN;
 float radiusMax = WC::R_MAX;
 
-// ----- Fence 담장 기준 계산 -----
-
-//담장이 차지하는 반쪽 좌우,앞뒤 방향 거리
+// ----- Fence -----
 float fenceHalfW = WC::YARD_W * 0.5f + WC::FENCE_MARGIN;
 float fenceHalfL = WC::YARD_L * 0.5f + WC::FENCE_MARGIN;
 
-//앞/뒤 담장 전체 길이
 float fenceLenX = WC::YARD_W + WC::FENCE_MARGIN * 2.0f + WC::FENCE_THK;
-//좌/우 담장 전체 길이
 float fenceLenZ = WC::YARD_L + WC::FENCE_MARGIN * 2.0f + WC::FENCE_THK;
-//담장 두께
 float fenceThk = WC::FENCE_THK;
 
-//담장 색
+float gateOffsetX = 3.5f;
+float gateW = 6.0f;
+float sideFenceLen = (fenceLenX - gateW) * 0.5f;
+float sideOffset = (gateW * 0.5f) + (sideFenceLen * 0.5f);
+
+float pillarW = 0.6f;
+float pillarH = 2.4f;
+
 glm::vec3 fenceColor(0.75f, 0.70f, 0.60f);
+
+//yard
+float yardFullW = fenceHalfW * 2.0f;
+float yardFullL = fenceHalfL * 2.0f;
+
 
 static void glfw_error_callback(int code, const char* desc) {
     std::cerr << "[GLFW ERROR] " << code << " : " << (desc ? desc : "") << "\n";
@@ -236,108 +243,167 @@ int main() {
     // World items
     std::vector<RenderItem> items;
 
+    //ground
     const float groundY = WC::GROUND_Y;
     const float overlayY = WC::OVERLAY_Y;
 
-    // 1) Grass ground
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, groundY, 0.0f), glm::vec3(0.0f),
-                              glm::vec3(WC::GROUND_SIZE, WC::GROUND_THK, WC::GROUND_SIZE)),
-        WC::COL_GRASS
-        });
-
-    // 2) Road
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::ROAD_W, WC::ROAD_THK, WC::ROAD_L)),
-        WC::COL_ROAD
-        });
-
-    // 2-1) Center dashed line
-    for (int i = -5; i <= 5; i++) {
-        float z = WC::ROAD_Z + i * 10.0f;
-        items.push_back({
-            MakeModel_BottomPivot(glm::vec3(0.0f, overlayY + 0.001f, z), glm::vec3(0.0f),
-                                  glm::vec3(0.5f, 0.01f, 4.0f)),
-            WC::COL_LINE
-            });
-    }
-
-    // 3) Sidewalks
-    float xLeft = -(WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
-    float xRight = +(WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
-
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(xLeft, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L)),
-        WC::COL_SIDEWALK
-        });
-
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(xRight, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L)),
-        WC::COL_SIDEWALK
-        });
-
-    // 4) Shinchan house pivot + yard
     glm::vec3 shinHouseCenter = WC::SHIN_CENTER;
 
+    // ----- front fence split calculation -----
+    float fenceLeftX = shinHouseCenter.x - fenceLenX * 0.5f;
+    float fenceRightX = shinHouseCenter.x + fenceLenX * 0.5f;
+
+    float gateCenterX = shinHouseCenter.x + gateOffsetX;
+    float gateLeftX = gateCenterX - gateW * 0.5f;
+    float gateRightX = gateCenterX + gateW * 0.5f;
+
+    float leftLen = gateLeftX - fenceLeftX;
+    float rightLen = fenceRightX - gateRightX;
+
+    float leftCenterX = fenceLeftX + leftLen * 0.5f;
+    float rightCenterX = gateRightX + rightLen * 0.5f;
+
+    // 1) Grass ground
     items.push_back({
-        MakeModel_BottomPivot(glm::vec3(shinHouseCenter.x, overlayY, shinHouseCenter.z), glm::vec3(0.0f),
-                              glm::vec3(WC::YARD_W, WC::YARD_THK, WC::YARD_L)),
-        WC::COL_YARD
+    MakeModel_BottomPivot(glm::vec3(0.0f, groundY, 0.0f), glm::vec3(0.0f),
+                          glm::vec3(WC::GROUND_SIZE, WC::GROUND_THK, WC::GROUND_SIZE)),
+    WC::COL_GRASS
         });
 
+    //yard
+    items.push_back({
+    MakeModel_BottomPivot(
+        glm::vec3(
+            shinHouseCenter.x,
+            overlayY,
+            shinHouseCenter.z
+        ),
+        glm::vec3(0.0f),
+        glm::vec3(
+            yardFullW,         
+            WC::YARD_THK,
+            yardFullL          
+        )
+    ),
+    WC::COL_YARD
+        });
 
     // ===============================
-    //          Fence(담장)
+    // Fence with Entrance
     // ===============================
-    // Front
+
     items.push_back({
-        MakeModel_BottomPivot(
-            glm::vec3(0.0f, WC::GROUND_Y, shinHouseCenter.z + fenceHalfL),
-            glm::vec3(0.0f),
-            glm::vec3(fenceLenX, WC::FENCE_H, WC::FENCE_THK)
-        ),
-        fenceColor
+       MakeModel_BottomPivot(
+           glm::vec3(
+               shinHouseCenter.x,
+               WC::GROUND_Y,
+               shinHouseCenter.z - fenceHalfL
+           ),
+           glm::vec3(0.0f),
+           glm::vec3(fenceLenX, WC::FENCE_H, WC::FENCE_THK)
+       ),
+       fenceColor
         });
 
-    // Back
     items.push_back({
-        MakeModel_BottomPivot(
-            glm::vec3(0.0f, WC::GROUND_Y, shinHouseCenter.z - fenceHalfL),
-            glm::vec3(0.0f),
-            glm::vec3(fenceLenX, WC::FENCE_H, WC::FENCE_THK)
-        ),
-        fenceColor
+       MakeModel_BottomPivot(
+           glm::vec3(
+               shinHouseCenter.x - fenceHalfW,
+               WC::GROUND_Y,
+               shinHouseCenter.z
+           ),
+           glm::vec3(0.0f),
+           glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ)
+       ),
+       fenceColor
         });
 
-    // Left
     items.push_back({
-        MakeModel_BottomPivot(
-            glm::vec3(-fenceHalfW, WC::GROUND_Y, shinHouseCenter.z),
-            glm::vec3(0.0f),
-            glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ)
-        ),
-        fenceColor
+       MakeModel_BottomPivot(
+           glm::vec3(
+               shinHouseCenter.x + fenceHalfW,
+               WC::GROUND_Y,
+               shinHouseCenter.z
+           ),
+           glm::vec3(0.0f),
+           glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ)
+       ),
+       fenceColor
         });
 
-    // Right
     items.push_back({
-        MakeModel_BottomPivot(
-            glm::vec3(+fenceHalfW, WC::GROUND_Y, shinHouseCenter.z),
-            glm::vec3(0.0f),
-            glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ)
-        ),
-        fenceColor
+     MakeModel_BottomPivot(
+         glm::vec3(
+             leftCenterX,
+             WC::GROUND_Y,
+             shinHouseCenter.z + fenceHalfL
+         ),
+         glm::vec3(0.0f),
+         glm::vec3(leftLen, WC::FENCE_H, fenceThk)
+     ),
+     fenceColor
+        });
+
+    items.push_back({
+      MakeModel_BottomPivot(
+          glm::vec3(
+              rightCenterX,
+              WC::GROUND_Y,
+              shinHouseCenter.z + fenceHalfL
+          ),
+          glm::vec3(0.0f),
+          glm::vec3(rightLen, WC::FENCE_H, fenceThk)
+      ),
+      fenceColor
+        });
+
+    float pillarW = 0.6f;
+    float pillarH = 2.4f;
+
+    items.push_back({
+    MakeModel_BottomPivot(
+        glm::vec3(gateLeftX, WC::GROUND_Y, shinHouseCenter.z + fenceHalfL),
+        glm::vec3(0.0f),
+        glm::vec3(pillarW, pillarH, pillarW)
+    ),
+    glm::vec3(0.7f, 0.6f, 0.5f)
+        });
+
+    items.push_back({
+    MakeModel_BottomPivot(
+        glm::vec3(gateRightX, WC::GROUND_Y, shinHouseCenter.z + fenceHalfL),
+        glm::vec3(0.0f),
+        glm::vec3(pillarW, pillarH, pillarW)
+    ),
+    glm::vec3(0.7f, 0.6f, 0.5f)
         });
 
 
-    // 4-1) Driveway
+
+    // ===== Driveway =====
+    float driveW = gateW;
+    float driveL = 10.0f;
+
+    float frontFenceCenterZ = shinHouseCenter.z + fenceHalfL;
+    float frontFenceOuterZ = frontFenceCenterZ + fenceThk * 0.5f;
+
+    float driveCenterZ = frontFenceOuterZ + driveL * 0.5f;
+
     items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, overlayY, WC::DRIVE_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::DRIVE_W, WC::DRIVE_THK, WC::DRIVE_L)),
-        glm::vec3(0.30f, 0.30f, 0.30f)
+        MakeModel_BottomPivot(
+            glm::vec3(
+                gateCenterX,
+                overlayY,
+                driveCenterZ
+            ),
+            glm::vec3(0.0f),
+            glm::vec3(
+                driveW,
+                WC::DRIVE_THK,
+                driveL
+            )
+        ),
+        glm::vec3(0.45f, 0.45f, 0.45f)
         });
 
     float lastFrame = 0.0f;
