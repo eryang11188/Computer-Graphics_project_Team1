@@ -2,6 +2,8 @@
 // C++ + OpenGL(3.3) + GLFW + GLAD + GLM
 // Ground/Road/Sidewalk + Orbit Camera + Wheel Zoom + Borderless Window
 // House blocking (walls/porch) + Prism roof (single)
+// main.cpp 
+
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -27,6 +29,29 @@ float angularSpeed = WC::CAM_SPEED;
 float zoomSpeed = WC::ZOOM_SPEED;
 float radiusMin = WC::R_MIN;
 float radiusMax = WC::R_MAX;
+
+// ----- Fence -----
+float fenceHalfW = WC::YARD_W * 0.5f + WC::FENCE_MARGIN;
+float fenceHalfL = WC::YARD_L * 0.5f + WC::FENCE_MARGIN;
+
+float fenceLenX = WC::YARD_W + WC::FENCE_MARGIN * 2.0f + WC::FENCE_THK;
+float fenceLenZ = WC::YARD_L + WC::FENCE_MARGIN * 2.0f + WC::FENCE_THK;
+float fenceThk = WC::FENCE_THK;
+
+float gateOffsetX = 3.5f;
+float gateW = 6.0f;
+float sideFenceLen = (fenceLenX - gateW) * 0.5f;
+float sideOffset = (gateW * 0.5f) + (sideFenceLen * 0.5f);
+
+float pillarW = 0.6f;
+float pillarH = 2.4f;
+
+glm::vec3 fenceColor(0.75f, 0.70f, 0.60f);
+
+//yard
+float yardFullW = fenceHalfW * 2.0f;
+float yardFullL = fenceHalfL * 2.0f;
+
 
 static void glfw_error_callback(int code, const char* desc) {
     std::cerr << "[GLFW ERROR] " << code << " : " << (desc ? desc : "") << "\n";
@@ -363,6 +388,199 @@ int main() {
         glm::vec3(WC::DRIVE_W, WC::DRIVE_THK, WC::DRIVE_L),
         glm::vec3(0.30f, 0.30f, 0.30f),
         true);
+        // World items
+    std::vector<RenderItem> items;
+
+    // ground / overlay
+    const float groundY = WC::GROUND_Y;
+    const float overlayY = WC::OVERLAY_Y;
+
+
+    glm::vec3 shinHouseCenter = WC::SHIN_CENTER;
+
+    // ----- front fence split calculation -----
+    float fenceLeftX = shinHouseCenter.x - fenceLenX * 0.5f;
+    float fenceRightX = shinHouseCenter.x + fenceLenX * 0.5f;
+
+    float gateCenterX = shinHouseCenter.x + gateOffsetX;
+    float gateLeftX = gateCenterX - gateW * 0.5f;
+    float gateRightX = gateCenterX + gateW * 0.5f;
+
+    float leftLen = gateLeftX - fenceLeftX;
+    float rightLen = fenceRightX - gateRightX;
+
+    float leftCenterX = fenceLeftX + leftLen * 0.5f;
+    float rightCenterX = gateRightX + rightLen * 0.5f;
+
+    // 1) Grass ground
+    items.push_back({
+    MakeModel_BottomPivot(glm::vec3(0.0f, groundY, 0.0f), glm::vec3(0.0f),
+                          glm::vec3(WC::GROUND_SIZE, WC::GROUND_THK, WC::GROUND_SIZE)),
+    WC::COL_GRASS
+        });
+
+    //yard
+    items.push_back({
+    MakeModel_BottomPivot(
+        glm::vec3(
+            shinHouseCenter.x,
+            overlayY,
+            shinHouseCenter.z
+        ),
+        glm::vec3(0.0f),
+        glm::vec3(
+            yardFullW,
+            WC::YARD_THK,
+            yardFullL
+        )
+    ),
+    WC::COL_YARD
+        });
+
+    // ===============================
+    // Fence with Entrance
+    // ===============================
+
+    items.push_back({
+       MakeModel_BottomPivot(
+           glm::vec3(
+               shinHouseCenter.x,
+               overlayY,
+               shinHouseCenter.z - fenceHalfL
+           ),
+           glm::vec3(0.0f),
+           glm::vec3(fenceLenX, WC::FENCE_H, WC::FENCE_THK)
+       ),
+       fenceColor
+        });
+
+    items.push_back({
+       MakeModel_BottomPivot(
+           glm::vec3(
+               shinHouseCenter.x - fenceHalfW,
+               overlayY,
+               shinHouseCenter.z
+           ),
+           glm::vec3(0.0f),
+           glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ)
+       ),
+       fenceColor
+        });
+
+    items.push_back({
+       MakeModel_BottomPivot(
+           glm::vec3(
+               shinHouseCenter.x + fenceHalfW,
+               overlayY,
+               shinHouseCenter.z
+           ),
+           glm::vec3(0.0f),
+           glm::vec3(WC::FENCE_THK, WC::FENCE_H, fenceLenZ)
+       ),
+       fenceColor
+        });
+
+    items.push_back({
+     MakeModel_BottomPivot(
+         glm::vec3(
+             leftCenterX,
+             overlayY,
+             shinHouseCenter.z + fenceHalfL
+         ),
+         glm::vec3(0.0f),
+         glm::vec3(leftLen, WC::FENCE_H, fenceThk)
+     ),
+     fenceColor
+        });
+
+    items.push_back({
+      MakeModel_BottomPivot(
+          glm::vec3(
+              rightCenterX,
+              overlayY,
+              shinHouseCenter.z + fenceHalfL
+          ),
+          glm::vec3(0.0f),
+          glm::vec3(rightLen, WC::FENCE_H, fenceThk)
+      ),
+      fenceColor
+        });
+
+
+
+    items.push_back({
+    MakeModel_BottomPivot(
+        glm::vec3(gateLeftX, overlayY, shinHouseCenter.z + fenceHalfL),
+        glm::vec3(0.0f),
+        glm::vec3(pillarW, pillarH, pillarW)
+    ),
+    glm::vec3(0.7f, 0.6f, 0.5f)
+        });
+
+    items.push_back({
+    MakeModel_BottomPivot(
+        glm::vec3(gateRightX, overlayY, shinHouseCenter.z + fenceHalfL),
+        glm::vec3(0.0f),
+        glm::vec3(pillarW, pillarH, pillarW)
+    ),
+    glm::vec3(0.7f, 0.6f, 0.5f)
+        });
+
+
+
+    // ===== Driveway =====
+    float driveW = gateW;
+    float driveL = 10.0f;
+
+    float frontFenceCenterZ = shinHouseCenter.z + fenceHalfL;
+    float frontFenceOuterZ = frontFenceCenterZ + fenceThk * 0.5f;
+
+    float driveCenterZ = frontFenceOuterZ + driveL * 0.5f;
+
+    items.push_back({
+        MakeModel_BottomPivot(
+            glm::vec3(
+                gateCenterX,
+                overlayY,
+                driveCenterZ
+            ),
+            glm::vec3(0.0f),
+            glm::vec3(
+                driveW,
+                WC::DRIVE_THK,
+                driveL
+            )
+        ),
+        glm::vec3(0.45f, 0.45f, 0.45f)
+        });
+
+    // --- 소나무 (계단식 사각뿔 형태) ---
+    glm::vec3 pinePos = shinHouseCenter + glm::vec3(8.0f, 0.0f, 6.0f);
+    pinePos.y = overlayY;
+
+    // 1) 나무 기둥 (Brown)
+    items.push_back({
+        MakeModel_BottomPivot(pinePos, glm::vec3(0.0f), glm::vec3(0.7f, 3.5f, 0.7f)),
+        glm::vec3(0.35f, 0.20f, 0.10f)
+        });
+
+    // 2) 나뭇잎 - 하단
+    items.push_back({
+        MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 2.5f, 0.0f), glm::vec3(0.0f), glm::vec3(4.0f, 1.2f, 4.0f)),
+        WC::COL_GRASS
+        });
+
+    // 3) 나뭇잎 - 중단
+    items.push_back({
+        MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 3.7f, 0.0f), glm::vec3(0.0f), glm::vec3(2.8f, 1.0f, 2.8f)),
+        WC::COL_GRASS
+        });
+
+    // 4) 나뭇잎 - 상단
+    items.push_back({
+        MakeModel_BottomPivot(pinePos + glm::vec3(0.0f, 4.7f, 0.0f), glm::vec3(0.0f), glm::vec3(1.5f, 1.0f, 1.5f)),
+        WC::COL_GRASS
+        });
 
     // ===== House blocking =====
     const float houseBaseY = overlayY + WC::YARD_THK;
