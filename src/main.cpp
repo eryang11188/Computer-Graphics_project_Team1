@@ -1,6 +1,7 @@
-// main.cpp
+// main.cpp (B: Prism roof only)
 // C++ + OpenGL(3.3) + GLFW + GLAD + GLM
-// Ground/Road/Sidewalk + Orbit Camera + Mouse Wheel Zoom + Borderless Window
+// Ground/Road/Sidewalk + Orbit Camera + Wheel Zoom + Borderless Window
+// House blocking (walls/porch) + Prism roof (single)
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -11,10 +12,10 @@
 
 #include <vector>
 #include <iostream>
-#include <cmath> // std::sin, std::cos
+#include <cmath>
 
-#include "WorldConfig.h"
-#include "TransformUtils.h"
+#include "WorldConfig.h"     // same folder as main.cpp
+#include "TransformUtils.h"  // same folder as main.cpp
 
 // Orbit camera
 float yaw = 0.0f;
@@ -31,11 +32,11 @@ static void glfw_error_callback(int code, const char* desc) {
     std::cerr << "[GLFW ERROR] " << code << " : " << (desc ? desc : "") << "\n";
 }
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+void framebuffer_size_callback(GLFWwindow*, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-void scroll_callback(GLFWwindow* window, double, double yoffset) {
+void scroll_callback(GLFWwindow*, double, double yoffset) {
     radius -= (float)yoffset * zoomSpeed;
     if (radius < radiusMin) radius = radiusMin;
     if (radius > radiusMax) radius = radiusMax;
@@ -87,10 +88,41 @@ GLuint linkProgram(GLuint vs, GLuint fs) {
     return prog;
 }
 
+enum class MeshId { Cube, Roof };
+
 struct RenderItem {
+    MeshId mesh;
     glm::mat4 model;
     glm::vec3 color;
 };
+
+static void AddCube(std::vector<RenderItem>& items,
+    const glm::vec3& pos,
+    const glm::vec3& eulerRad,
+    const glm::vec3& scale,
+    const glm::vec3& color,
+    bool bottomPivot = true)
+{
+    glm::mat4 m = bottomPivot
+        ? MakeModel_BottomPivot(pos, eulerRad, scale)
+        : MakeModel_CenterPivot(pos, eulerRad, scale);
+
+    items.push_back({ MeshId::Cube, m, color });
+}
+
+static void AddRoof(std::vector<RenderItem>& items,
+    const glm::vec3& pos,
+    const glm::vec3& eulerRad,
+    const glm::vec3& scale,
+    const glm::vec3& color,
+    bool bottomPivot = true)
+{
+    glm::mat4 m = bottomPivot
+        ? MakeModel_BottomPivot(pos, eulerRad, scale)
+        : MakeModel_CenterPivot(pos, eulerRad, scale);
+
+    items.push_back({ MeshId::Roof, m, color });
+}
 
 int main() {
     glfwSetErrorCallback(glfw_error_callback);
@@ -115,21 +147,17 @@ int main() {
     glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-    const int WIN_W = WC::WIN_W;
-    const int WIN_H = WC::WIN_H;
-
-    GLFWwindow* window = glfwCreateWindow(WIN_W, WIN_H, "World (Borderless Window)", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(WC::WIN_W, WC::WIN_H, "Shinchan World (Roof B Only)", nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window\n";
         glfwTerminate();
         return -1;
     }
 
-    // Center on monitor
     int mx, my;
     glfwGetMonitorPos(monitor, &mx, &my);
-    int x = mx + (mode->width - WIN_W) / 2;
-    int y = my + (mode->height - WIN_H) / 2;
+    int x = mx + (mode->width - WC::WIN_W) / 2;
+    int y = my + (mode->height - WC::WIN_H) / 2;
     glfwSetWindowPos(window, x, y);
 
     glfwMakeContextCurrent(window);
@@ -150,8 +178,8 @@ int main() {
 
     glEnable(GL_DEPTH_TEST);
 
-    // Cube vertices (8) + indices (36)
-    float vertices[] = {
+    // ===== Cube mesh (8 verts + EBO indices) =====
+    float cubeVerts[] = {
         -0.5f, -0.5f, -0.5f,
          0.5f, -0.5f, -0.5f,
          0.5f,  0.5f, -0.5f,
@@ -162,7 +190,7 @@ int main() {
         -0.5f,  0.5f,  0.5f
     };
 
-    unsigned int indices[] = {
+    unsigned int cubeIdx[] = {
         0,1,2, 2,3,0,
         4,5,6, 6,7,4,
         0,4,7, 7,3,0,
@@ -170,25 +198,74 @@ int main() {
         0,1,5, 5,4,0,
         3,2,6, 6,7,3
     };
+    constexpr int CUBE_INDEX_COUNT = 36;
 
-    unsigned int VAO, VBO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+    unsigned int cubeVAO, cubeVBO, cubeEBO;
+    glGenVertexArrays(1, &cubeVAO);
+    glGenBuffers(1, &cubeVBO);
+    glGenBuffers(1, &cubeEBO);
 
-    glBindVertexArray(VAO);
+    glBindVertexArray(cubeVAO);
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVerts), cubeVerts, GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIdx), cubeIdx, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
     glBindVertexArray(0);
 
+    // ===== Roof mesh (triangular prism) =====
+    float roofVerts[] = {
+        // left triangle (x = -0.5)
+        -0.5f, -0.5f, -0.5f,   // 0
+        -0.5f, -0.5f,  0.5f,   // 1
+        -0.5f,  0.5f,  0.0f,   // 2
+
+        // right triangle (x = +0.5)
+         0.5f, -0.5f, -0.5f,   // 3
+         0.5f, -0.5f,  0.5f,   // 4
+         0.5f,  0.5f,  0.0f    // 5
+    };
+
+    unsigned int roofIdx[] = {
+        // side triangles
+        0,2,1,
+        3,4,5,
+
+        // bottom quad
+        0,1,4,  4,3,0,
+
+        // back quad
+        0,3,5,  5,2,0,
+
+        // front quad
+        1,2,5,  5,4,1
+    };
+    const int ROOF_INDEX_COUNT = (int)(sizeof(roofIdx) / sizeof(unsigned int));
+
+    unsigned int roofVAO, roofVBO, roofEBO;
+    glGenVertexArrays(1, &roofVAO);
+    glGenBuffers(1, &roofVBO);
+    glGenBuffers(1, &roofEBO);
+
+    glBindVertexArray(roofVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, roofVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(roofVerts), roofVerts, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, roofEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(roofIdx), roofIdx, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
+
+    // ===== Shader (simple color) =====
     const char* vertexShaderSrc = R"(
         #version 330 core
         layout (location = 0) in vec3 aPos;
@@ -213,72 +290,126 @@ int main() {
 
     glUseProgram(shaderProgram);
     GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
-    GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
-    GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+    GLint viewLoc  = glGetUniformLocation(shaderProgram, "view");
+    GLint projLoc  = glGetUniformLocation(shaderProgram, "projection");
     GLint colorLoc = glGetUniformLocation(shaderProgram, "uColor");
 
-    // World items
+    // ===== World items =====
     std::vector<RenderItem> items;
 
-    const float groundY = WC::GROUND_Y;
+    const float groundY  = WC::GROUND_Y;
     const float overlayY = WC::OVERLAY_Y;
 
-    // 1) Grass ground
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, groundY, 0.0f), glm::vec3(0.0f),
-                              glm::vec3(WC::GROUND_SIZE, WC::GROUND_THK, WC::GROUND_SIZE)),
-        WC::COL_GRASS
-        });
+    // Pivot for camera and house placement
+    glm::vec3 shinCenter = WC::SHIN_CENTER;
+
+    // 1) Ground (grass)
+    AddCube(items,
+        glm::vec3(0.0f, groundY, 0.0f),
+        glm::vec3(0.0f),
+        glm::vec3(WC::GROUND_SIZE, WC::GROUND_THK, WC::GROUND_SIZE),
+        WC::COL_GRASS,
+        true);
 
     // 2) Road
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::ROAD_W, WC::ROAD_THK, WC::ROAD_L)),
-        WC::COL_ROAD
-        });
+    AddCube(items,
+        glm::vec3(0.0f, overlayY, WC::ROAD_Z),
+        glm::vec3(0.0f),
+        glm::vec3(WC::ROAD_W, WC::ROAD_THK, WC::ROAD_L),
+        WC::COL_ROAD,
+        true);
 
-    // 2-1) Center dashed line
-    for (int i = -5; i <= 5; i++) {
+    // 2-1) Road dashed center line
+    for (int i = -5; i <= 5; ++i) {
         float z = WC::ROAD_Z + i * 10.0f;
-        items.push_back({
-            MakeModel_BottomPivot(glm::vec3(0.0f, overlayY + 0.001f, z), glm::vec3(0.0f),
-                                  glm::vec3(0.5f, 0.01f, 4.0f)),
-            WC::COL_LINE
-            });
+        AddCube(items,
+            glm::vec3(0.0f, overlayY + 0.001f, z),
+            glm::vec3(0.0f),
+            glm::vec3(0.5f, 0.01f, 4.0f),
+            WC::COL_LINE,
+            true);
     }
 
     // 3) Sidewalks
-    float xLeft = -(WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
+    float xLeft  = -(WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
     float xRight = +(WC::ROAD_W * 0.5f + WC::SIDEWALK_W * 0.5f);
 
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(xLeft, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L)),
-        WC::COL_SIDEWALK
-        });
+    AddCube(items,
+        glm::vec3(xLeft, overlayY, WC::ROAD_Z),
+        glm::vec3(0.0f),
+        glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L),
+        WC::COL_SIDEWALK,
+        true);
 
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(xRight, overlayY, WC::ROAD_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L)),
-        WC::COL_SIDEWALK
-        });
+    AddCube(items,
+        glm::vec3(xRight, overlayY, WC::ROAD_Z),
+        glm::vec3(0.0f),
+        glm::vec3(WC::SIDEWALK_W, WC::SIDEWALK_THK, WC::SIDEWALK_L),
+        WC::COL_SIDEWALK,
+        true);
 
-    // 4) Shinchan house pivot + yard
-    glm::vec3 shinHouseCenter = WC::SHIN_CENTER;
-
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(shinHouseCenter.x, overlayY, shinHouseCenter.z), glm::vec3(0.0f),
-                              glm::vec3(WC::YARD_W, WC::YARD_THK, WC::YARD_L)),
-        WC::COL_YARD
-        });
+    // 4) Yard
+    AddCube(items,
+        glm::vec3(shinCenter.x, overlayY, shinCenter.z),
+        glm::vec3(0.0f),
+        glm::vec3(WC::YARD_W, WC::YARD_THK, WC::YARD_L),
+        WC::COL_YARD,
+        true);
 
     // 4-1) Driveway
-    items.push_back({
-        MakeModel_BottomPivot(glm::vec3(0.0f, overlayY, WC::DRIVE_Z), glm::vec3(0.0f),
-                              glm::vec3(WC::DRIVE_W, WC::DRIVE_THK, WC::DRIVE_L)),
-        glm::vec3(0.30f, 0.30f, 0.30f)
-        });
+    AddCube(items,
+        glm::vec3(0.0f, overlayY, WC::DRIVE_Z),
+        glm::vec3(0.0f),
+        glm::vec3(WC::DRIVE_W, WC::DRIVE_THK, WC::DRIVE_L),
+        glm::vec3(0.30f, 0.30f, 0.30f),
+        true);
 
+    // ===== House blocking =====
+    const float houseBaseY = overlayY + WC::YARD_THK;
+
+    const glm::vec3 COL_WALL   = glm::vec3(0.82f, 0.76f, 0.63f);
+    const glm::vec3 COL_PORCH  = glm::vec3(0.78f, 0.72f, 0.60f);
+    const glm::vec3 COL_ROOF   = glm::vec3(0.65f, 0.18f, 0.18f);
+    const glm::vec3 COL_CHIMNY = glm::vec3(0.30f, 0.18f, 0.12f);
+
+    const float wallW = 14.0f;
+    const float wallH = 7.0f;
+    const float wallD = 10.0f;
+
+    // Main walls
+    AddCube(items,
+        glm::vec3(shinCenter.x, houseBaseY, shinCenter.z),
+        glm::vec3(0.0f),
+        glm::vec3(wallW, wallH, wallD),
+        COL_WALL,
+        true);
+
+    // Porch block (assume front is +Z)
+    AddCube(items,
+        glm::vec3(shinCenter.x + 4.5f, houseBaseY, shinCenter.z + 4.2f),
+        glm::vec3(0.0f),
+        glm::vec3(5.0f, 4.0f, 3.5f),
+        COL_PORCH,
+        true);
+
+    // Chimney
+    AddCube(items,
+        glm::vec3(shinCenter.x - 4.0f, houseBaseY + wallH + 1.2f, shinCenter.z - 2.5f),
+        glm::vec3(0.0f),
+        glm::vec3(1.2f, 3.5f, 1.2f),
+        COL_CHIMNY,
+        true);
+
+    // Roof (prism only) - placed on top of wall
+    // Scale meaning: width(x) / height(y) / depth(z)
+    AddRoof(items,
+        glm::vec3(shinCenter.x, houseBaseY + wallH, shinCenter.z),
+        glm::vec3(0.0f),
+        glm::vec3(wallW + 1.0f, 4.0f, wallD + 1.0f),
+        COL_ROOF,
+        true);
+
+    // ===== Render loop =====
     float lastFrame = 0.0f;
 
     while (!glfwWindowShouldClose(window)) {
@@ -295,30 +426,36 @@ int main() {
         glfwGetFramebufferSize(window, &w, &h);
         float aspect = (h == 0) ? 1.0f : (float)w / (float)h;
 
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 200.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 300.0f);
 
-        // Use std::sin/std::cos to avoid missing <cmath> issues
         float cp = (float)std::cos((double)pitch);
         float sp = (float)std::sin((double)pitch);
         float cy = (float)std::cos((double)yaw);
         float sy = (float)std::sin((double)yaw);
 
         glm::vec3 cameraPos;
-        cameraPos.x = shinHouseCenter.x + radius * cp * sy;
-        cameraPos.y = shinHouseCenter.y + radius * sp;
-        cameraPos.z = shinHouseCenter.z + radius * cp * cy;
+        cameraPos.x = shinCenter.x + radius * cp * sy;
+        cameraPos.y = shinCenter.y + radius * sp;
+        cameraPos.z = shinCenter.z + radius * cp * cy;
 
-        glm::mat4 view = glm::lookAt(cameraPos, shinHouseCenter, glm::vec3(0, 1, 0));
+        glm::mat4 view = glm::lookAt(cameraPos, shinCenter, glm::vec3(0, 1, 0));
 
         glUseProgram(shaderProgram);
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-        glBindVertexArray(VAO);
         for (const auto& it : items) {
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(it.model));
             glUniform3fv(colorLoc, 1, glm::value_ptr(it.color));
-            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+            if (it.mesh == MeshId::Cube) {
+                glBindVertexArray(cubeVAO);
+                glDrawElements(GL_TRIANGLES, CUBE_INDEX_COUNT, GL_UNSIGNED_INT, 0);
+            }
+            else { // MeshId::Roof
+                glBindVertexArray(roofVAO);
+                glDrawElements(GL_TRIANGLES, ROOF_INDEX_COUNT, GL_UNSIGNED_INT, 0);
+            }
         }
         glBindVertexArray(0);
 
@@ -326,10 +463,17 @@ int main() {
         glfwPollEvents();
     }
 
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
+    // Cleanup
+    glDeleteVertexArrays(1, &cubeVAO);
+    glDeleteBuffers(1, &cubeVBO);
+    glDeleteBuffers(1, &cubeEBO);
+
+    glDeleteVertexArrays(1, &roofVAO);
+    glDeleteBuffers(1, &roofVBO);
+    glDeleteBuffers(1, &roofEBO);
+
     glDeleteProgram(shaderProgram);
+
     glfwTerminate();
     return 0;
 }
