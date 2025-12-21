@@ -12,9 +12,11 @@
 #include <cstdlib>
 #include <algorithm>
 
+// [변경] 사용자가 보내준 헤더 파일 포함
 #include "WorldConfig.h"
 #include "TransformUtils.h"
 
+// 카메라 및 줌 관련 전역 변수 초기화 (WorldConfig 값 사용)
 float yaw = 0.0f;
 float pitch = glm::radians(WC::CAM_PITCH_DEG);
 float radius = WC::CAM_RADIUS;
@@ -88,6 +90,112 @@ struct RenderItem {
     glm::vec3 color;
 };
 
+// 그림자 맵 생성용 쉐이더 (Pass 1)
+const char* shadowVertexShaderSrc = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+
+uniform mat4 lightSpaceMatrix;
+uniform mat4 model;
+
+void main() {
+    gl_Position = lightSpaceMatrix * model * vec4(aPos, 1.0);
+}
+)";
+
+const char* shadowFragmentShaderSrc = R"(
+#version 330 core
+void main() {
+    // 깊이 버퍼에만 기록하므로 색상은 출력하지 않음
+}
+)";
+
+// 메인 렌더링 쉐이더 (Pass 2) - 그림자 적용
+const char* vertexShaderSrc = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform mat4 lightSpaceMatrix;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec4 FragPosLightSpace;
+
+void main() {
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    FragPosLightSpace = lightSpaceMatrix * worldPos;
+    gl_Position = projection * view * worldPos;
+}
+)";
+
+const char* fragmentShaderSrc = R"(
+#version 330 core
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec4 FragPosLightSpace;
+
+uniform vec3 uColor;
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+uniform vec3 viewPos;
+uniform float ambientStrength;
+uniform float specularStrength;
+uniform float shininess;
+
+uniform sampler2D shadowMap;
+
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    
+    if(projCoords.z > 1.0) return 0.0;
+
+    float currentDepth = projCoords.z;
+    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
+
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+        }    
+    }
+    shadow /= 9.0;
+    
+    return shadow;
+}
+
+void main() {
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = normalize(lightPos - FragPos);
+
+    float diff = max(dot(norm, lightDir), 0.0);
+
+    vec3 viewDir = normalize(viewPos - FragPos);
+    vec3 halfDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(norm, halfDir), 0.0), shininess);
+
+    vec3 ambient = ambientStrength * lightColor;
+    vec3 diffuse = diff * lightColor;
+    vec3 specular = specularStrength * spec * lightColor;
+
+    float shadow = ShadowCalculation(FragPosLightSpace, norm, lightDir);
+    vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * uColor;
+
+    FragColor = vec4(lighting, 1.0);
+}
+)";
+
+
 int main() {
     srand((unsigned int)time(nullptr));
     glfwSetErrorCallback(glfw_error_callback);
@@ -114,7 +222,7 @@ int main() {
     const int WIN_W = WC::WIN_W;
     const int WIN_H = WC::WIN_H;
 
-    GLFWwindow* window = glfwCreateWindow(WIN_W, WIN_H, "World", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(WIN_W, WIN_H, "Final House with Shadow", nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window\n";
         glfwTerminate();
@@ -145,7 +253,33 @@ int main() {
 
     glEnable(GL_DEPTH_TEST);
 
+    // =========================================================
+    // 그림자 맵 FBO 및 텍스처 설정
+    // =========================================================
+    const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
+    unsigned int depthMapFBO;
+    glGenFramebuffers(1, &depthMapFBO);
+
+    unsigned int depthMapTexture;
+    glGenTextures(1, &depthMapTexture);
+    glBindTexture(GL_TEXTURE_2D, depthMapTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMapTexture, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // =========================================================
+
     float vertices[] = {
+        // ... (vertices data) ...
       -0.5f,-0.5f, 0.5f,  0.0f, 0.0f, 1.0f,
        0.5f,-0.5f, 0.5f,  0.0f, 0.0f, 1.0f,
        0.5f, 0.5f, 0.5f,  0.0f, 0.0f, 1.0f,
@@ -184,7 +318,7 @@ int main() {
         12,13,14, 14,15,12,
         16,17,18, 18,19,16,
         20,21,22, 22,23,20
-    };;
+    };
 
     unsigned int VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
@@ -205,70 +339,26 @@ int main() {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-
     glBindVertexArray(0);
 
-    const char* vertexShaderSrc = R"(
-#version 330 core
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aNormal;
-
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-
-out vec3 FragPos;
-out vec3 Normal;
-
-void main() {
-    vec4 worldPos = model * vec4(aPos, 1.0);
-    FragPos = worldPos.xyz;
-    Normal = mat3(transpose(inverse(model))) * aNormal;
-    gl_Position = projection * view * worldPos;
-}
-)";
-
-    const char* fragmentShaderSrc = R"(
-#version 330 core
-out vec4 FragColor;
-
-in vec3 FragPos;
-in vec3 Normal;
-
-uniform vec3 uColor;
-uniform vec3 lightPos;
-uniform vec3 lightColor;
-uniform vec3 viewPos;
-uniform float ambientStrength;
-uniform float specularStrength;
-uniform float shininess;
-
-void main() {
-    vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(lightPos - FragPos);
-
-    float diff = max(dot(norm, lightDir), 0.0);
-
-    vec3 viewDir = normalize(viewPos - FragPos);
-    vec3 halfDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(norm, halfDir), 0.0), shininess);
-
-    vec3 ambient = ambientStrength * lightColor;
-    vec3 diffuse = diff * lightColor;
-    vec3 specular = specularStrength * spec * lightColor;
-
-    vec3 color = (ambient + diffuse) * uColor + specular;
-    FragColor = vec4(color, 1.0);
-}
-)";
-
-
+    // 쉐이더 프로그램 컴파일 및 링크
     GLuint vs = compileShader(GL_VERTEX_SHADER, vertexShaderSrc);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSrc);
     GLuint shaderProgram = linkProgram(vs, fs);
     glDeleteShader(vs);
     glDeleteShader(fs);
 
+    GLuint shadowVs = compileShader(GL_VERTEX_SHADER, shadowVertexShaderSrc);
+    GLuint shadowFs = compileShader(GL_FRAGMENT_SHADER, shadowFragmentShaderSrc);
+    GLuint shadowShaderProgram = linkProgram(shadowVs, shadowFs);
+    glDeleteShader(shadowVs);
+    glDeleteShader(shadowFs);
+
+    // 그림자 쉐이더 유니폼
+    GLint shadowLightSpaceMatrixLoc = glGetUniformLocation(shadowShaderProgram, "lightSpaceMatrix");
+    GLint shadowModelLoc = glGetUniformLocation(shadowShaderProgram, "model");
+
+    // 메인 쉐이더 유니폼
     glUseProgram(shaderProgram);
     GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
     GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
@@ -281,8 +371,11 @@ void main() {
     GLint specularLoc = glGetUniformLocation(shaderProgram, "specularStrength");
     GLint shininessLoc = glGetUniformLocation(shaderProgram, "shininess");
 
+    GLint lightSpaceMatrixLoc = glGetUniformLocation(shaderProgram, "lightSpaceMatrix");
+    GLint shadowMapLoc = glGetUniformLocation(shaderProgram, "shadowMap");
+    glUniform1i(shadowMapLoc, 0);
 
-
+    // [변경] WorldConfig 상수를 사용하도록 변수 설정
     const float groundY = WC::GROUND_Y;
     const float overlayY = WC::OVERLAY_Y;
     glm::vec3 center = WC::SHIN_CENTER;
@@ -355,6 +448,7 @@ void main() {
 
     std::vector<RenderItem> items;
 
+    // [변경] TransformUtils.h의 함수 사용
     auto AddBottom = [&](glm::vec3 pos, glm::vec3 euler, glm::vec3 scl, glm::vec3 col) {
         items.push_back({ MakeModel_BottomPivot(pos, euler, scl), col });
         };
@@ -1754,13 +1848,44 @@ void main() {
 
         processInput(window, deltaTime);
 
+        glm::vec3 lightPos = center + glm::vec3(45.0f, 55.0f, 35.0f);
+
+        // ---------------------------------------------
+        // Pass 1: Shadow Map Generation (Light View)
+        // ---------------------------------------------
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        // 야외 씬 전체를 커버하기 위한 직교 투영 행렬
+        float near_plane = 1.0f, far_plane = 200.0f;
+        glm::mat4 lightProjection = glm::ortho(-100.0f, 100.0f, -100.0f, 100.0f, near_plane, far_plane);
+        glm::mat4 lightView = glm::lookAt(lightPos, center, glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
+        glUseProgram(shadowShaderProgram);
+        glUniformMatrix4fv(shadowLightSpaceMatrixLoc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+
+        glBindVertexArray(VAO);
+        for (const auto& it : items) {
+            glUniformMatrix4fv(shadowModelLoc, 1, GL_FALSE, glm::value_ptr(it.model));
+            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        }
+        glBindVertexArray(0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // ---------------------------------------------
+        // Pass 2: Scene Rendering (Camera View)
+        // ---------------------------------------------
+        int w, h;
+        glfwGetFramebufferSize(window, &w, &h);
+        glViewport(0, 0, w, h);
         glClearColor(0.55f, 0.75f, 0.95f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        int w, h;
-        glfwGetFramebufferSize(window, &w, &h);
-        float aspect = (h == 0) ? 1.0f : (float)w / (float)h;
+        glUseProgram(shaderProgram);
 
+        float aspect = (h == 0) ? 1.0f : (float)w / (float)h;
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 260.0f);
 
         float cp = (float)std::cos((double)pitch);
@@ -1775,13 +1900,10 @@ void main() {
 
         glm::mat4 view = glm::lookAt(cameraPos, center, glm::vec3(0, 1, 0));
 
-        glUseProgram(shaderProgram);
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-        glm::vec3 lightPos = center + glm::vec3(45.0f, 55.0f, 35.0f);
         glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
-
         glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPos));
         glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
         glUniform3fv(viewPosLoc, 1, glm::value_ptr(cameraPos));
@@ -1789,6 +1911,10 @@ void main() {
         glUniform1f(specularLoc, 0.45f);
         glUniform1f(shininessLoc, 64.0f);
 
+        // 그림자 관련 유니폼 설정
+        glUniformMatrix4fv(lightSpaceMatrixLoc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, depthMapTexture);
 
         glBindVertexArray(VAO);
         for (const auto& it : items) {
@@ -1806,6 +1932,9 @@ void main() {
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     glDeleteProgram(shaderProgram);
+    glDeleteProgram(shadowShaderProgram);
+    glDeleteFramebuffers(1, &depthMapFBO);
+    glDeleteTextures(1, &depthMapTexture);
 
     glfwTerminate();
     return 0;
