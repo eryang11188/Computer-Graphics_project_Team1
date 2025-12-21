@@ -204,9 +204,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-#endif
+
 
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
@@ -357,7 +355,7 @@ int main() {
     GLint ambientLoc = glGetUniformLocation(shaderProgram, "ambientStrength");
     GLint specularLoc = glGetUniformLocation(shaderProgram, "specularStrength");
     GLint shininessLoc = glGetUniformLocation(shaderProgram, "shininess");
-    
+
     GLint lightSpaceMatrixLoc = glGetUniformLocation(shaderProgram, "lightSpaceMatrix");
     GLint shadowMapLoc = glGetUniformLocation(shaderProgram, "shadowMap");
     glUniform1i(shadowMapLoc, 0);
@@ -1739,7 +1737,7 @@ int main() {
                 cloudColor);
             };
 
-        int cloudCount = 35;
+        int cloudCount = 27;
         float halfGroundCloud = WC::GROUND_SIZE * 0.5f - 10.0f;
 
         for (int i = 0; i < cloudCount; ++i) {
