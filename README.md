@@ -466,7 +466,7 @@
     AddCenter(..., slotCol); // 검은색 투입구
     AddCenter(..., flagCol); // 빨간색 깃발
     ```
-       ![우편함](./screenshots/우편함.png)
+  ![우편함](./screenshots/우편함.png)
 
 ---
 
